@@ -2,19 +2,19 @@ module Game where
 
 
 import Options
+import Utils
+import Sprites
+import Types
 
 import System.IO
 import System.Timeout
 import Data.Fixed
 import Data.Char
-import Debug.Trace
 import Control.Concurrent
 import System.CPUTime
 import Data.List
 
 
-
-type Position2D = (Double,Double)   -- in squares, starting top left
 data MonsterType = Zombie | Demon deriving(Show, Eq)
 data Normal = NormalNorth | NormalWest | NormalSouth | NormalEast deriving(Show, Eq)
 data Weapon = Knife | Gun | Uzi deriving(Show, Eq)
@@ -43,188 +43,6 @@ gameMap1 =
     sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE
   ]
 
-
-type SpriteType = Int
-spriteNone = -1
-spriteTree = 0
-spriteZombie = 1   -- animated, 2 frames
--- skip
-spriteDemon = 3    -- animated, 2 frames
--- skip
-spriteGun = 5
-spriteUzi = 6
-spriteMedkit = 7
--- skip
-spriteFPKnife = 8  -- animated, 2 frames
--- skip
-spriteFPGun = 10   -- animated, 2 frames
--- skip
-spriteFPUzi = 12   -- animated, 2 frames
-
-grayscaleMap = ['M','$','o','?','/','!',';',':','\'','.','-']          -- characters sorted by brigtness
-
-animatedSpriteIds = [1,3,8,10,12]     -- list of sprite IDs that are animated
-
-spriteList =
-  [
-    [ -- 0
-      "XXXXXXXXXXXXXXX",
-      "XXXX/'''''\\XXXX",
-      "XX/'       ''\\X",
-      "X|   O        |",
-      "X|        O   |",
-      "XX\\_  O      /X",
-      "XXXX\\_  ____/XX",
-      "XXXXXX||XXXXXXX",
-      "XXXXXX||XXXXXXX",
-      "XX-=#/__\\#=-XXX"],
-    [ -- 1
-      "XXXXXXXXXXXXXXX",
-      "XXXXX/```\\XXXXX",
-      "XXXXX[o.o]XXXXX",
-      "XXXXX\\II]/XXXXX",
-      "XXX/^^````(III)",
-      "X(III]    /XXXX",
-      "XXXX(_____)XXXX",
-      "XXXX(  _  )XXXX",
-      "XXXX| |X\\ |XXXX",
-      "X--(__]=|__)--X"],
-    [ -- 2
-      "XXXXXXXXXXXXXXXX",
-      "XXXXX/```\\XXXXX",
-      "XXXXX[o.o]XXXXX",
-      "XXXXX\\[II/XXXXX",
-      "X(III]```^^\\XXX",
-      "XXXX\\    (III)X",
-      "XXXX|_____)XXXX",
-      "XXXX(  _  )XXXX",
-      "XXXX/ | | |XXXX",
-      "X--(__/=|__)--X"],
-    [ -- 3
-      "X|\\X-''`''-X/|X",
-      "X\\;`       `;/X",
-      "X/ ,_     _, \\X",
-      "X( \\0) , (0/ )X",
-      "XX\\_:  ^  :_/XX",
-      "XXXX\\ |^| /XXXX",
-      "XXXX| [_] |XXXX",
-      "XXXXX\\___/XXXXX",
-      "XXXXXXXXXXXXXXX",
-      "X--==#####==--X"],
-    [ -- 4
-      "|\\XX-'```'-XX/|",
-      "\\ ;`       `; /",
-      "X/ ,_ \\ / _, \\X",
-      "X( (0)   (0) )X",
-      "XX\\_   A   _/XX",
-      "XXXX) ___ (XXXX",
-      "XXXX( ' ' )XXXX",
-      "XXXXX'---'XXXXX",
-      "XXXXXXXXXXXXXXX",
-      "X--==#####==--X"],
-    [ -- 5
-      "XXXXXXXXXXXXXXX",
-      "XXXXXXXXXXXXXXX",
-      "Xl_/_\\\\\\^^^^^^]",
-      "X/  P\\_______/X",
-      "/    ({_)XXXXXX",
-      "|   /XXXXXXXXXX",
-      "(___)XXXXXXXXXX",
-      "XXXXXXXXXXXXXXX",
-      "XXXXXXXXXXXXXXX",
-      "X--==#####==--X"],
-    [ -- 6
-      "|^\\XXXXXXXXX/^|",
-      "|  ^^^^^^^^^ _|",
-      "|  -o-- [[[(_o)",
-      "|___________  |",
-      "XX\\  __|X[_]\\_|",
-      "XX/ /_]XX| |XXX",
-      "X/ /XXXXX| |XXX",
-      "|_/XXXXXX|_|XXX",
-      "XXXXXXXXXXXXXXX",
-      "--===#####===--"],
-    [ -- 7
-      "XXXXXXXXXXXXXXX",
-      "XX/`````````\\XX",
-      "X| ..  _  .. |X",
-      "X|   _| |_   |X",
-      "X|  [  +  ]  |X",
-      "X|   `|_|`   |X",
-      "X| ..     .. |X",
-      "XX\\_________/XX",
-      "XXXXXXXXXXXXXXX",
-      " --==#####==-- "],
-    [ -- 8
-      "XXXXXXXXXXXXXXX",
-      "XXXXXXXXXXXXXXX",
-      "XXXXXXXXXXXXXXX",
-      "XXXXXXXXX/|XXXX",                   
-      "XXXXXXXX/ |XXXX",
-      "XXXXXXX( ,|XXXX",
-      "XXXXXXX| |<XXXX",
-      "XXXXXXX| |<XXXX",
-      "XXXXXXX| |<XXXX",
-      "XXXXXXX| |<XXXX"],
-     [ -- 9
-      "XXXXXXXXXXXXXXX",
-      "XXXXXXXXXXXXXXX",
-      "XX|\\XXXXXXXXXXX",
-      "XX| \\XXXXXXXXXX",
-      "XX( ,\\XXXXXXXXX",
-      "XXX\\ \\LXXXXXXXX",
-      "XXXX\\ \\LXXXXXXX",
-      "XXXXX\\ \\LX/\\XXX",
-      "XXXXXX\\ \\V /XXX",
-      "XXXX\\^^ ,  \\XXX"],
-     [ -- 10
-      "X/^^\\XXXXXXXXXX",
-      "[:\\ Y\\XXXXXXXXX",
-      "X\\:\\__`\\XXXXXXX",
-      "XX\\:\\ \\ \\XXXXXX",
-      "XXX\\:\\`  `\\XXXX",
-      "XXX/\\:\\____\\XXX",
-      "XX(_|::\\ P |\\XX",
-      "XX( \\_:|   | )X",
-      "XX(\\_ )-___/ /X",
-      "XXX\\ \\      |XX"],
-     [ -- 11
-      "XWWWWWWWXXXXXXX",
-      "WW/^^\\WWXXXXXXX",
-      "WW|:) Y\\WXXXXXX",
-      "XW(:( _ \\XXXXXX",
-      "XXX|:( \\ \\XXXXX",
-      "XXX\\::)`  \\XXXX",
-      "XXXX\\:(    \\XXX",
-      "XXXX(::\\____|\\X",
-      "XXX/|::|  P | |",
-      "XX(  \\_|    | /"],
-     [ -- 12
-      "X[\\^^\\XXXXXXXXX",
-      "X|:\\__\\XXXXXXXX",
-      "C|::|__|XXXXXXX",
-      "X|: :\\ \\XXXXXXX",
-      "X|:  :\\ \\XXXXXX",
-      "X|::\\ :\\ `\\XXXX",
-      "XX\\_:\\ :\\  \\XXX",
-      "XXX|\\:\\ :\\__\\XX",
-      "XX/|:\\:O :\\  `\\",
-      "X( |:|\\:::|^^^|"],
-     [ -- 13
-      "WXXXXXXXXXXXXXX",
-      "WWXXXXXXXXXXXXX",
-      "WWW[\\^^\\XXXXXXX",
-      "XWW|:\\__\\XXXXXX",
-      "XWC|::|__|XXXXX",
-      "XXW|: :\\ \\XXXXX",
-      "XXX|:  :\\ \\XXXX",
-      "XXX|::\\ :\\ `\\XX",
-      "XXXX\\_:\\ :\\  \\X",
-      "XXXX/ \\:\\ :\\__\\"
-     ]
-  ]
-
-
 data GameState = GameState
   { playerPos     :: Position2D
   , playerRot     :: Double            -- rotation in radians, CCW, 0 = facing right
@@ -238,12 +56,7 @@ data GameState = GameState
   , fireCountdown :: Int           -- counter for implementing different fire rates
   } deriving (Show)
   
-
-data Sprite = Sprite
-  { spriteType :: SpriteType
-  , spritePos  :: Position2D
-  } deriving (Show)
-  
+ 
 
 data Monster = Monster
   { monsterType :: MonsterType
@@ -256,83 +69,32 @@ data Monster = Monster
 
 newMonster :: MonsterType -> Position2D -> Monster
 newMonster monsterType initialPosition = Monster
-  {
-    monsterType = monsterType,
-    monsterPos = initialPosition,
-    health = 
-      if monsterType == Zombie
-        then monsterHealthZombie
-        else monsterHealthDemon,
-    countdownAI = 0,
-    monsterRot = 0
+  { monsterType = monsterType
+  , monsterPos  = initialPosition
+  , health      = if monsterType == Zombie then monsterHealthZombie else monsterHealthDemon
+  , countdownAI = 0
+  , monsterRot  = 0
   }
   
 
 initialGameState :: GameState
 initialGameState = GameState
-  {
-    playerPos       = (7.5,8.5),
-    playerRot       = 0.0,
-    frameNumber     = 0,
-    currentWeapon   = Knife,
-    currentLevel    = 1,
-    currentScore    = 0,
-    gameMap         = gameMap1,
-    monsters        =
-      [
-        newMonster Zombie (6,7),
-        newMonster Demon (8,5),
-        newMonster Demon (10,2),
-        newMonster Demon (2,10)
-      ],
-    sprites = [],
-    fireCountdown   = 0
+  { playerPos     = (7.5,8.5)
+  , playerRot     = 0.0
+  , frameNumber   = 0
+  , currentWeapon = Knife
+  , currentLevel  = 1
+  , currentScore  = 0
+  , gameMap       = gameMap1
+  , monsters      =
+      [ newMonster Zombie (6,7)
+      , newMonster Demon (8,5)
+      , newMonster Demon (10,2)
+      , newMonster Demon (2,10)
+      ]
+  , sprites       = []
+  , fireCountdown = 0
   }
-
-
---   Functions for 3-item tuples.
-fst3 (x, _, _) = x
-snd3 (_, x, _) = x
-thd3 (_, _, x) = x
-
-
---   Splits given list to chunks of size n.
-splitChunks _ [] = []
-splitChunks n list = first : (splitChunks n rest)
-  where
-    (first,rest) = splitAt n list
-
-
---   Fills given string with spaces to given length.
-toLength :: String -> Int -> String
-toLength what outputLength =
-  what ++ [' ' | i <- [1.. outputLength - length(what)]]
-
-
---   Alternative version of trace for debugging.
-trace2 :: a -> (a -> String) -> a
-trace2 what func =
-  trace (func what) what
-
-
--- Ensures given values is in given interval by clamping it.
-clamp :: (Ord a) => a -> (a, a) -> a
-clamp value (minimum, maximum) =
-  (min maximum . max minimum) value
-
-
--- Adds two 2-item pair tuples, itemwise.
-addPairs :: (Num a) => (a, a) -> (a, a) -> (a, a)
-addPairs (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
-
-
-substractPairs :: Num a => (a, a) -> (a, a) -> (a, a)
-substractPairs (x1, y1) (x2, y2) = (x1 - x2, y1 - y2)
-
-
--- Applies floor function to both items of a pair.
-floorPair :: (RealFrac a) => (RealFrac b) => (a, b) -> (Int, Int)
-floorPair couple = (floor (fst couple),floor (snd couple))
 
 
 -- Makes the angle safe for tan function.
@@ -343,8 +105,7 @@ tanSafeAngle angle
 
 
 vectorAngle :: Position2D -> Double
-vectorAngle vector =
-  atan2 (-1 * (snd vector)) (fst vector)
+vectorAngle vector = atan2 (-1 * (snd vector)) (fst vector)
 
 
 -- Returns the result of angle1 - angle2 closest to 0.
@@ -352,8 +113,7 @@ angleAngleDifference :: Double -> Double -> Double
 angleAngleDifference angle1 angle2 
   | difference > pi = difference - 2 * pi
   | otherwise       = difference
-  where 
-    difference = angleTo02Pi (angle1 - angle2)
+  where difference = angleTo02Pi (angle1 - angle2)
     
 
 angleTo02Pi :: Double -> Double
@@ -363,42 +123,34 @@ angleTo02Pi angle = mod' angle (2 * pi)
 -- Gets distance of two points.
 pointPointDistance :: Position2D -> Position2D -> Double
 pointPointDistance point1 point2 =
-  let
-    dx = (fst point1) - (fst point2)
-    dy = (snd point1) - (snd point2)
-  in
-    sqrt (dx * dx + dy * dy)
+  let dx = (fst point1) - (fst point2)
+      dy = (snd point1) - (snd point2)
+   in sqrt $ dx * dx + dy * dy
      
 
 -- Converts 2D map coords to 1D array coords.
 mapToArrayCoords :: (Int, Int) -> Int
-mapToArrayCoords coords =
-  snd coords * (fst mapSize) + fst coords
+mapToArrayCoords coords = snd coords * (fst mapSize) + fst coords
 
 
 -- Converts 1D array coords to 2D map coords.
 arrayToMapCoords :: Int -> (Int, Int)
-arrayToMapCoords coords =
-  (mod coords (fst mapSize), div coords (fst mapSize))
+arrayToMapCoords coords = (mod coords (fst mapSize), div coords (fst mapSize))
 
 
 -- Computes an intersection point of two lines.
 lineLineIntersection :: Position2D -> Double -> Position2D -> Double -> Position2D
 lineLineIntersection (x1,y1) angle1 (x2,y2) angle2 = (x,y)
-  where
-    tan1 = tan (tanSafeAngle angle1)
-    tan2 = tan (tanSafeAngle angle2)
-    x = (y2 - tan2 * x2 - y1 + tan1 * x1) / (tan1 - tan2)
-    y = if abs tan1 < abs tan2 then tan1 * x + (y1 - tan1 * x1) else tan2 * x + (y2 - tan2 * x2)
+  where tan1 = tan (tanSafeAngle angle1)
+        tan2 = tan (tanSafeAngle angle2)
+        x = (y2 - tan2 * x2 - y1 + tan1 * x1) / (tan1 - tan2)
+        y = if abs tan1 < abs tan2 then tan1 * x + (y1 - tan1 * x1) else tan2 * x + (y2 - tan2 * x2)
 
 
 -- Maps normalized intensity to ASCII character.
 intensityToChar :: Double -> Char
-intensityToChar intensity =
-  let
-    safeIndex = clamp (floor (intensity * fromIntegral (length grayscaleMap))) (0,(length grayscaleMap) - 1)
-  in
-    grayscaleMap !! safeIndex 
+intensityToChar intensity = let safeIndex = clamp (floor (intensity * fromIntegral (length grayscaleMap))) (0,(length grayscaleMap) - 1)
+                             in grayscaleMap !! safeIndex 
     
 
 -- Returns an intensity addition (possibly negative) cause by distance.
@@ -411,8 +163,9 @@ distanceToSize :: Double -> Double
 distanceToSize distance = 1.0 / (distance + 1.0)
   
 
-{- Projects sprites to screen space, returns a list representing screen, each
-   pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
+{- Projects sprites to screen space, returns a list representing screen, 
+   each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
+
 projectSprites :: GameState -> [(SpriteType,Int,Double)]
 projectSprites gameState =
   let
@@ -608,12 +361,9 @@ weaponSprite weaponId
 -- Renders the game in 3D.
 renderGameState :: GameState -> String
 renderGameState gameState =
-  let
-    wallDrawInfo = castRays gameState
-    gunSprite = weaponSprite (currentWeapon gameState) +
-      if (fireCountdown gameState) /= 0
-        then 1
-        else 0
+  let wallDrawInfo = castRays gameState
+      gunSprite = weaponSprite (currentWeapon gameState) +
+        if (fireCountdown gameState) /= 0 then 1 else 0
   in
     (
       overlay
@@ -628,7 +378,7 @@ renderGameState gameState =
     renderInfoBar gameState 
     
 
---   Renders the game state into string, simple version.
+-- Renders the game state into string, simple version.
 renderMap :: GameState -> String
 renderMap gameState =
   concat
@@ -664,13 +414,13 @@ renderMap gameState =
     )
     
 
---   Gets the distance from projection origin to projection plane.
+-- Gets the distance from projection origin to projection plane.
 distanceToProjectionPlane :: Double -> Double -> Double
 distanceToProjectionPlane focalDistance angleFromCenter =
   focalDistance * (cos angleFromCenter)
 
 
---   Casts all rays needed to render player's view, returns a list of ray cast results.
+-- Casts all rays needed to render player's view, returns a list of ray cast results.
 castRays :: GameState -> [(Double, Normal)]
 castRays gameState =
   [
@@ -689,7 +439,7 @@ castRays gameState =
   ]
 
 
---   Casts a ray and returns an information (distance, normal) about a wall it hits.
+-- Casts a ray and returns an information (distance, normal) about a wall it hits.
 castRay :: GameState -> Position2D -> (Int, Int) -> Double -> Int ->  (Double, Normal)
 castRay gameState rayOrigin square rayDirection maxIterations =
   let
@@ -716,7 +466,7 @@ castRay gameState rayOrigin square rayDirection maxIterations =
           )
 
 
---   Casts a ray inside a single square, returns (intersection point with square bounds,next square offset)
+-- Casts a ray inside a single square, returns (intersection point with square bounds,next square offset)
 castRaySquare :: (Int, Int) -> Position2D -> Double -> (Position2D,(Int, Int))
 castRaySquare squareCoords rayPosition rayAngle =
   let
@@ -731,14 +481,14 @@ castRaySquare squareCoords rayPosition rayAngle =
       else (intersection2,(0,if boundY == (snd squareCoords) then -1 else 1))
 
 
---   Returns map square at given coords.
+-- Returns map square at given coords.
 mapSquareAt :: GameState -> (Int, Int) -> MapSquare
 mapSquareAt gameState coords 
   | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = (gameMap gameState) !! (mapToArrayCoords coords)
   | otherwise = SquareWall
 
 
---   Checks if given player position is valid (collisions).
+-- Checks if given player position is valid (collisions).
 positionIsWalkable :: GameState -> Position2D -> Bool
 positionIsWalkable gameState position =
   (mapSquareAt gameState (floorPair position)) == SquareEmpty
@@ -931,8 +681,7 @@ nextGameState previousGameState inputChar =
 
 -- Reads all available chars on input and returns the last one, or ' ' if not available.
 getLastChar :: IO Char
-getLastChar =
-  do
+getLastChar = do
     isInput <- hWaitForInput stdin 1
     
     if isInput
@@ -976,9 +725,4 @@ gameMain = do
     hSetBuffering stdout (BlockBuffering (Just 20000))  -- to read flickering
     hSetEcho stdout False                               
     gameLoop initialGameState
-
-
-
-
-
 
