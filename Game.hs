@@ -403,17 +403,17 @@ castRays gs@GameState{..} =
 
 -- Casts a ray and returns an information (distance, normal) about a wall it hits.
 castRay :: GameState -> Position2D -> (Int, Int) -> Double -> Int ->  (Double, Normal)
-castRay gameState rayOrigin square rayDirection maxIterations =
+castRay gs@GameState{..} rayOrigin square rayDirection maxIterations =
   let
     squareCoords = floorPair rayOrigin
     angle = angleTo02Pi rayDirection
   in
-    if (mapSquareAt gameState square) /= SquareEmpty || maxIterations == 0
+    if (mapSquareAt _gameMap square) /= SquareEmpty || maxIterations == 0
       then (0,NormalNorth)
       else
         let
           squareCastResult = castRaySquare square rayOrigin angle
-          recursionResult = castRay gameState (fst squareCastResult) (addPairs square (snd squareCastResult)) angle (maxIterations - 1)
+          recursionResult = castRay gs (fst squareCastResult) (addPairs square (snd squareCastResult)) angle (maxIterations - 1)
         in
           (
             pointPointDistance rayOrigin (fst squareCastResult) + (fst recursionResult),
@@ -444,23 +444,16 @@ castRaySquare squareCoords rayPosition rayAngle =
 
 
 -- Returns map square at given coords.
-mapSquareAt :: GameState -> (Int, Int) -> MapSquare
-mapSquareAt gs@GameState{..} coords 
-  | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = _gameMap !! (mapToArrayCoords coords)
-  | otherwise = SquareWall
-
--- Returns map square at given coords.
-mapSquareAt' :: GameMap -> (Int, Int) -> MapSquare
-mapSquareAt' gmap coords 
+mapSquareAt :: GameMap -> (Int, Int) -> MapSquare
+mapSquareAt gmap coords 
   | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = gmap !! (mapToArrayCoords coords)
   | otherwise = SquareWall
-
 
 
 -- Checks if given player position is valid (collisions).
 positionIsWalkable :: GameState -> Position2D -> Bool
 positionIsWalkable gs@GameState{..} position =
-  (mapSquareAt' _gameMap (floorPair position)) == SquareEmpty
+  (mapSquareAt _gameMap (floorPair position)) == SquareEmpty
 
  
 
@@ -468,11 +461,12 @@ positionIsWalkable gs@GameState{..} position =
 updateSprites :: GameState -> GameState
 updateSprites gs@GameState{..} = gs
     { _sprites = 
-        [ Sprite { spriteType = monsterSprite (_monsterType monster)
-                 , spritePos = (_monsterPos monster)
-                 } | monster <- _monsters 
+        [ Sprite { spriteType = monsterSprite (_monsterType m)
+                 , spritePos = (_monsterPos m)
+                 } | m <- _monsters 
         ]
     }
+
 
 
 monsterAI :: GameState -> Monster -> Monster
