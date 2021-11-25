@@ -7,6 +7,7 @@ import Utils
 import Sprites
 import Types
 import Monster
+import GameMap 
 
 import System.IO
 import System.Timeout
@@ -19,33 +20,6 @@ import Data.List
 
 data Normal = NormalNorth | NormalWest | NormalSouth | NormalEast deriving(Show, Eq)
 data Weapon = Knife | Gun | Uzi deriving(Show, Eq)
-data MapSquare = SquareEmpty | SquareWall deriving(Show, Eq)
-
-sE = SquareEmpty                    -- short aliases
-sW = SquareWall
-
-type GameMap = [MapSquare]
-gameMap1 :: GameMap
-gameMap1 = 
-  [
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sW,sW,sE,sE,
-    sE,sE,sE,sW,sE,sE,sW,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sW,sE,sE,sW,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sW,sE,sE,sW,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sW,sE,sE,sW,sE,sE,sE,sE,sE,sW,sE,sW,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sW,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sW,sW,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sW,sW,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,
-    sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE
-  ]
-
-
 
 data GameState = GameState
   { _playerPos     :: Position2D
@@ -443,7 +417,6 @@ castRaySquare squareCoords rayPosition rayAngle =
       else (intersection2,(0,if boundY == (snd squareCoords) then -1 else 1))
 
 
-
 -- Returns map square at given coords.
 mapSquareAt :: GameMap -> (Int, Int) -> MapSquare
 mapSquareAt gmap coords 
@@ -452,18 +425,15 @@ mapSquareAt gmap coords
 
 
 -- Checks if given player position is valid (collisions).
-positionIsWalkable :: GameState -> Position2D -> Bool
-positionIsWalkable gs@GameState{..} position =
-  (mapSquareAt _gameMap (floorPair position)) == SquareEmpty
-
+positionIsWalkable :: GameMap -> Position2D -> Bool
+positionIsWalkable gmap position =
+  (mapSquareAt gmap (floorPair position)) == SquareEmpty
  
 
 -- Creates sprites and places them on the map depending on current state of things.
-updateSprites' ::  [Monster] -> [Sprite]
-updateSprites' ms = [ Sprite { spriteType = monsterSprite (_monsterType m)
-                             , spritePos  = (_monsterPos m)
-                 } | m <- ms 
-        ]
+updateSprites ::  [Monster] -> [Sprite]
+updateSprites ms = map (\m -> Sprite { spriteType = monsterSprite (_monsterType m)
+                                     , spritePos  = (_monsterPos m)}) ms  
 
 
 monsterAI :: GameState -> Monster -> Monster
@@ -478,35 +448,31 @@ monsterAI gs whatMonster@Monster{..} =
     whatMonster
       { _monsterPos  = moveWithCollision gs _monsterPos _monsterRot (monsterStepLength _monsterType)
       ,  _monsterRot = rotation
-      , _countdownAI = if _countdownAI <= 0
-            then recomputeAIin else _countdownAI  - 1
+      , _countdownAI = if _countdownAI <= 0 then recomputeAIin else _countdownAI - 1
       }
     
 
 -- Runs the AI for each monster, updating their positions etc.
-updateMonsters' :: GameState -> [Monster] -> [Monster]
-updateMonsters' gs ms =
+updateMonsters :: GameState -> [Monster] -> [Monster]
+updateMonsters gs ms =
   if disableAI 
-     then ms
-     else map (monsterAI gs) $ filter ((>0) . _health) ms
+     then ms else map (monsterAI gs) $ filter ((>0) . _health) ms
 
 
 moveWithCollision :: GameState -> Position2D -> Double -> Double -> Position2D
-moveWithCollision gs positionFrom angle distance =
+moveWithCollision gs@GameState{..} positionFrom angle distance =
   let
     plusX = cos angle * distance
     plusY = -1 * (sin angle * distance)
   in
     (
-      (fst positionFrom) + 
-      if positionIsWalkable gs ((fst positionFrom) + plusX,snd positionFrom)
-        then plusX
-        else 0,
-      
-      (snd positionFrom) + 
-      if positionIsWalkable gs (fst positionFrom,(snd positionFrom) + plusY)
-        then plusY
-        else 0
+      fst positionFrom + 
+      if positionIsWalkable _gameMap (fst positionFrom + plusX, snd positionFrom)
+        then plusX else 0
+        ,
+      snd positionFrom + 
+      if positionIsWalkable _gameMap (fst positionFrom, snd positionFrom + plusY)
+        then plusY else 0
     )
       
 
@@ -520,15 +486,13 @@ movePlayerInDirection pgs@GameState{..} angle distance =
     pgs
       {
         _playerPos =
-          (
-            fst _playerPos  + 
-            if positionIsWalkable pgs (fst _playerPos + plusX, snd _playerPos)
-              then plusX
-              else 0,
-            snd _playerPos  + 
-            if positionIsWalkable pgs (fst _playerPos, snd _playerPos  + plusY)
-              then plusY
-              else 0
+          ( fst _playerPos + 
+            if positionIsWalkable _gameMap (fst _playerPos + plusX, snd _playerPos)
+              then plusX else 0
+                ,
+            snd _playerPos + 
+            if positionIsWalkable _gameMap (fst _playerPos, snd _playerPos + plusY)
+              then plusY else 0
           )
       }
 
@@ -587,8 +551,8 @@ nextGameState :: GameState -> GameState
 nextGameState gs@GameState{..}  =
     gs { _frameNumber   = _frameNumber + 1
        , _fireCountdown = max (_fireCountdown - 1) 0
-       , _monsters      = updateMonsters' gs _monsters
-       , _sprites       = updateSprites' _monsters
+       , _monsters      = updateMonsters gs _monsters
+       , _sprites       = updateSprites _monsters
        }
 
 
