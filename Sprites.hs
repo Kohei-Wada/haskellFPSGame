@@ -26,7 +26,6 @@ spriteFPGun   = 10 :: Int -- animated, 2 frames
 -- skip
 spriteFPUzi   = 12 :: Int -- animated, 2 frames
 
-grayscaleMap  = ['M','$','o','?','/','!',';',':','\'','.','-'] -- characters sorted by brigtness
 
 animatedSpriteIds = [1,3,8,10,12] :: [Int] -- list of sprite IDs that are animated
 

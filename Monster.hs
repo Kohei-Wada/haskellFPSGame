@@ -1,3 +1,5 @@
+{-#LANGUAGE RecordWildCards #-}
+
 module Monster where
 
 import Types
@@ -38,3 +40,8 @@ monsterStepLength monsterId
   | monsterId == Zombie = zombieStepLength
   | otherwise           = demonStepLength
  
+
+
+monsterDamaged :: Monster -> Int -> Monster
+monsterDamaged m@Monster{..} damage = 
+    m { _health = _health - damage }

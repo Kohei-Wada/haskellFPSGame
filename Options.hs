@@ -54,4 +54,3 @@ monsterHealthDemon = 50 :: Int
 
 weaponSpritePosition = ((fst viewSize) - (fst viewSize) `div` 3,1 + snd viewSize - snd spriteSize)
 
-
