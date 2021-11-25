@@ -443,6 +443,7 @@ castRaySquare squareCoords rayPosition rayAngle =
       else (intersection2,(0,if boundY == (snd squareCoords) then -1 else 1))
 
 
+
 -- Returns map square at given coords.
 mapSquareAt :: GameMap -> (Int, Int) -> MapSquare
 mapSquareAt gmap coords 
@@ -458,15 +459,11 @@ positionIsWalkable gs@GameState{..} position =
  
 
 -- Creates sprites and places them on the map depending on current state of things.
-updateSprites :: GameState -> GameState
-updateSprites gs@GameState{..} = gs
-    { _sprites = 
-        [ Sprite { spriteType = monsterSprite (_monsterType m)
-                 , spritePos = (_monsterPos m)
-                 } | m <- _monsters 
+updateSprites' ::  [Monster] -> [Sprite]
+updateSprites' ms = [ Sprite { spriteType = monsterSprite (_monsterType m)
+                             , spritePos  = (_monsterPos m)
+                 } | m <- ms 
         ]
-    }
-
 
 
 monsterAI :: GameState -> Monster -> Monster
@@ -487,12 +484,12 @@ monsterAI gs whatMonster@Monster{..} =
     
 
 -- Runs the AI for each monster, updating their positions etc.
-updateMonsters :: GameState -> GameState
-updateMonsters gs@GameState{..} =
+updateMonsters' :: GameState -> [Monster] -> [Monster]
+updateMonsters' gs ms =
   if disableAI 
-     then gs
-     else gs { _monsters = [monsterAI gs monster | monster <- filter ((>0) . _health) _monsters] }
-    
+     then ms
+     else map (monsterAI gs) $ filter ((>0) . _health) ms
+
 
 moveWithCollision :: GameState -> Position2D -> Double -> Double -> Position2D
 moveWithCollision gs positionFrom angle distance =
@@ -588,17 +585,17 @@ fire gs@GameState{..} =
 -- Computes the next game state.
 nextGameState :: GameState -> GameState
 nextGameState gs@GameState{..}  =
-    (updateMonsters $ updateSprites gs)
-    { _frameNumber = _frameNumber + 1
-    , _fireCountdown = max (_fireCountdown - 1) 0
-    }
+    gs { _frameNumber   = _frameNumber + 1
+       , _fireCountdown = max (_fireCountdown - 1) 0
+       , _monsters      = updateMonsters' gs _monsters
+       , _sprites       = updateSprites' _monsters
+       }
 
 
 -- Reads all available chars on input and returns the last one, or ' ' if not available.
 getLastChar :: IO Char
 getLastChar = do
     isInput <- hWaitForInput stdin 1
-    
     if isInput
       then do
         c1 <- getChar
@@ -654,5 +651,4 @@ gameMain = do
     hSetBuffering stdout (BlockBuffering (Just 20000))  -- to read flickering
     hSetEcho stdout False                               
     gameLoop initialGameState
-
 
