@@ -1,10 +1,12 @@
-module Game where
+{-#LANGUAGE RecordWildCards #-}
 
+module Game where
 
 import Options
 import Utils
 import Sprites
 import Types
+import Monster
 
 import System.IO
 import System.Timeout
@@ -15,7 +17,6 @@ import System.CPUTime
 import Data.List
 
 
-data MonsterType = Zombie | Demon deriving(Show, Eq)
 data Normal = NormalNorth | NormalWest | NormalSouth | NormalEast deriving(Show, Eq)
 data Weapon = Knife | Gun | Uzi deriving(Show, Eq)
 data MapSquare = SquareEmpty | SquareWall deriving(Show, Eq)
@@ -23,7 +24,8 @@ data MapSquare = SquareEmpty | SquareWall deriving(Show, Eq)
 sE = SquareEmpty                    -- short aliases
 sW = SquareWall
 
-gameMap1 :: [MapSquare]
+type GameMap = [MapSquare]
+gameMap1 :: GameMap
 gameMap1 = 
   [
     sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sW,sW,sE,sE,
@@ -43,81 +45,40 @@ gameMap1 =
     sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE,sE
   ]
 
+
+
 data GameState = GameState
-  { playerPos     :: Position2D
-  , playerRot     :: Double            -- rotation in radians, CCW, 0 = facing right
-  , frameNumber   :: Int
-  , currentWeapon :: Weapon
-  , currentLevel  :: Int
-  , currentScore  :: Int
-  , gameMap       :: [MapSquare]
-  , monsters      :: [Monster]                       -- list of monsters
-  , sprites       :: [Sprite]                        -- list of sprites
-  , fireCountdown :: Int           -- counter for implementing different fire rates
+  { _playerPos     :: Position2D
+  , _playerRot     :: Double            -- rotation in radians, CCW, 0 = facing right
+  , _frameNumber   :: Int
+  , _currentWeapon :: Weapon
+  , _currentLevel  :: Int
+  , _currentScore  :: Int
+  , _gameMap       :: GameMap
+  , _monsters      :: [Monster]                       -- list of monsters
+  , _sprites       :: [Sprite]                        -- list of sprites
+  , _fireCountdown :: Int           -- counter for implementing different fire rates
   } deriving (Show)
-  
  
-
-data Monster = Monster
-  { monsterType :: MonsterType
-  , monsterPos  :: Position2D
-  , health      :: Int
-  , countdownAI :: Int
-  , monsterRot  :: Double
-  } deriving (Show)
-  
-
-newMonster :: MonsterType -> Position2D -> Monster
-newMonster monsterType initialPosition = Monster
-  { monsterType = monsterType
-  , monsterPos  = initialPosition
-  , health      = if monsterType == Zombie then monsterHealthZombie else monsterHealthDemon
-  , countdownAI = 0
-  , monsterRot  = 0
-  }
-  
 
 initialGameState :: GameState
 initialGameState = GameState
-  { playerPos     = (7.5,8.5)
-  , playerRot     = 0.0
-  , frameNumber   = 0
-  , currentWeapon = Knife
-  , currentLevel  = 1
-  , currentScore  = 0
-  , gameMap       = gameMap1
-  , monsters      =
+  { _playerPos     = (7.5,8.5)
+  , _playerRot     = 0.0
+  , _frameNumber   = 0
+  , _currentWeapon = Knife
+  , _currentLevel  = 1
+  , _currentScore  = 0
+  , _gameMap       = gameMap1
+  , _monsters      =
       [ newMonster Zombie (6,7)
       , newMonster Demon (8,5)
       , newMonster Demon (10,2)
       , newMonster Demon (2,10)
       ]
-  , sprites       = []
-  , fireCountdown = 0
+  , _sprites       = []
+  , _fireCountdown = 0
   }
-
-
--- Makes the angle safe for tan function.
-tanSafeAngle :: Double -> Double
-tanSafeAngle angle
-  | mod' angle (pi / 2) == 0.0 = angle + 0.00001
-  | otherwise                  = angle
-
-
-vectorAngle :: Position2D -> Double
-vectorAngle vector = atan2 (-1 * (snd vector)) (fst vector)
-
-
--- Returns the result of angle1 - angle2 closest to 0.
-angleAngleDifference :: Double -> Double -> Double
-angleAngleDifference angle1 angle2 
-  | difference > pi = difference - 2 * pi
-  | otherwise       = difference
-  where difference = angleTo02Pi (angle1 - angle2)
-    
-
-angleTo02Pi :: Double -> Double
-angleTo02Pi angle = mod' angle (2 * pi)
 
 
 -- Gets distance of two points.
@@ -149,8 +110,9 @@ lineLineIntersection (x1,y1) angle1 (x2,y2) angle2 = (x,y)
 
 -- Maps normalized intensity to ASCII character.
 intensityToChar :: Double -> Char
-intensityToChar intensity = let safeIndex = clamp (floor (intensity * fromIntegral (length grayscaleMap))) (0,(length grayscaleMap) - 1)
-                             in grayscaleMap !! safeIndex 
+intensityToChar intensity = 
+    let safeIndex = clamp (floor (intensity * fromIntegral (length grayscaleMap))) (0,(length grayscaleMap) - 1)
+     in grayscaleMap !! safeIndex 
     
 
 -- Returns an intensity addition (possibly negative) cause by distance.
@@ -167,7 +129,7 @@ distanceToSize distance = 1.0 / (distance + 1.0)
    each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
 
 projectSprites :: GameState -> [(SpriteType,Int,Double)]
-projectSprites gameState =
+projectSprites gs@GameState{..} =
   let
     -- project all sprites to screenspace first:
     screenspaceSprites =                                         -- [(sprite id,sprite x pixel,distance)]
@@ -176,13 +138,13 @@ projectSprites gameState =
           spriteType sprite,                                     
             0.5 +                                                -- sprite center in screenspace, normalized
             (
-              angleAngleDifference (playerRot gameState) ( vectorAngle ( fst (spritePos sprite) - fst (playerPos gameState), snd (spritePos sprite) - snd (playerPos gameState) ) )
+              angleAngleDifference _playerRot  (vectorAngle ( fst (spritePos sprite) - fst _playerPos , snd (spritePos sprite) - snd _playerPos) )
             )
             / fieldOfView
             ,
-          (pointPointDistance (playerPos gameState) (spritePos sprite)) - spriteDepthBias   -- sprite distance
+          (pointPointDistance _playerPos (spritePos sprite)) - spriteDepthBias   -- sprite distance
         )
-        | sprite <- (sprites gameState)
+        | sprite <- _sprites 
       ]
       
     -- projects one sprite (sprite,x,y) to a screen list [(sprite id,sprite x pixel,distance)]
@@ -308,7 +270,7 @@ renderInfoBar gameState =
     separatorPositions = [0,15,31,63]
     separator = "+" ++ [if i `elem` separatorPositions then '+' else '~' | i <- [3..(fst viewSize)]] ++ "+"
     emptyLine = "|" ++ [if i `elem` separatorPositions then '|' else ' ' | i <- [3..(fst viewSize)]] ++ "|\n"
-    infoLine = "|  level: " ++ (toLength (show (currentLevel gameState)) 3) ++ "|  score: " ++ (toLength (show (currentScore gameState)) 6) ++ "|  health: 100/100  ##########  |  ammo: 100/100"
+    infoLine = "|  level: " ++ (toLength (show (_currentLevel gameState)) 3) ++ "|  score: " ++ (toLength (show (_currentScore gameState)) 6) ++ "|  health: 100/100  ##########  |  ammo: 100/100"
   in
     separator ++ "\n" ++
     emptyLine ++
@@ -362,12 +324,12 @@ weaponSprite weaponId
 renderGameState :: GameState -> String
 renderGameState gameState =
   let wallDrawInfo = castRays gameState
-      gunSprite = weaponSprite (currentWeapon gameState) +
-        if (fireCountdown gameState) /= 0 then 1 else 0
+      gunSprite = weaponSprite (_currentWeapon gameState) +
+        if (_fireCountdown gameState) /= 0 then 1 else 0
   in
     (
       overlay
-        (render3Dview wallDrawInfo (projectSprites gameState) (snd viewSize) (frameNumber gameState))
+        (render3Dview wallDrawInfo (projectSprites gameState) (snd viewSize) (_frameNumber gameState))
         (concat (spriteList !! gunSprite))
         weaponSpritePosition
         (addPairs viewSize (1,0))
@@ -393,10 +355,10 @@ renderMap gameState =
             )
             ++
             (
-              if floor (fst (playerPos gameState)) == fst (arrayToMapCoords (snd square)) &&
-                 floor (snd (playerPos gameState)) == snd (arrayToMapCoords (snd square))
+              if floor (fst (_playerPos gameState)) == fst (arrayToMapCoords (snd square)) &&
+                 floor (snd (_playerPos gameState)) == snd (arrayToMapCoords (snd square))
                 then
-                  case round (4.0 * (playerRot gameState) / pi)  of
+                  case round (4.0 * (_playerRot gameState) / pi)  of
                     0 -> "->"
                     1 -> "/^"
                     2 -> "|^"
@@ -410,7 +372,7 @@ renderMap gameState =
                   then "  "
                   else "[]"
             )
-        ) (zip (gameMap gameState) [0..])
+        ) (zip (_gameMap gameState) [0..])
     )
     
 
@@ -422,15 +384,15 @@ distanceToProjectionPlane focalDistance angleFromCenter =
 
 -- Casts all rays needed to render player's view, returns a list of ray cast results.
 castRays :: GameState -> [(Double, Normal)]
-castRays gameState =
+castRays gs@GameState{..} =
   [
     let
-      rayDirection = (playerRot gameState) + fieldOfView / 2 - (fromIntegral x) * rayAngleStep
-      rayResult = castRay gameState (playerPos gameState) (floorPair (playerPos gameState)) rayDirection maxRaycastIterations
+      rayDirection = _playerRot  + fieldOfView / 2 - (fromIntegral x) * rayAngleStep
+      rayResult = castRay gs _playerPos  (floorPair _playerPos) rayDirection maxRaycastIterations
     in
       (
         max
-          ( (fst rayResult) - (distanceToProjectionPlane focalLength (abs $ (playerRot gameState) - rayDirection)) )
+          ( (fst rayResult) - (distanceToProjectionPlane focalLength (abs $ _playerRot - rayDirection)) )
           0.0,
         snd rayResult
       )
@@ -483,92 +445,75 @@ castRaySquare squareCoords rayPosition rayAngle =
 
 -- Returns map square at given coords.
 mapSquareAt :: GameState -> (Int, Int) -> MapSquare
-mapSquareAt gameState coords 
-  | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = (gameMap gameState) !! (mapToArrayCoords coords)
+mapSquareAt gs@GameState{..} coords 
+  | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = _gameMap !! (mapToArrayCoords coords)
   | otherwise = SquareWall
+
+-- Returns map square at given coords.
+mapSquareAt' :: GameMap -> (Int, Int) -> MapSquare
+mapSquareAt' gmap coords 
+  | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = gmap !! (mapToArrayCoords coords)
+  | otherwise = SquareWall
+
 
 
 -- Checks if given player position is valid (collisions).
 positionIsWalkable :: GameState -> Position2D -> Bool
-positionIsWalkable gameState position =
-  (mapSquareAt gameState (floorPair position)) == SquareEmpty
+positionIsWalkable gs@GameState{..} position =
+  (mapSquareAt' _gameMap (floorPair position)) == SquareEmpty
 
-
-monsterSprite :: MonsterType -> Int
-monsterSprite monsterId
-  | monsterId == Zombie = spriteZombie
-  | otherwise           = spriteDemon
-  
-
-monsterStepLength :: MonsterType -> Double
-monsterStepLength monsterId
-  | monsterId == Zombie = zombieStepLength
-  | otherwise           = demonStepLength
-  
+ 
 
 -- Creates sprites and places them on the map depending on current state of things.
 updateSprites :: GameState -> GameState
-updateSprites gameState =
-  gameState
-    {
-      sprites =
-        [
-          Sprite {spriteType = monsterSprite (monsterType monster), spritePos = (monsterPos monster)}
-          | monster <- (monsters gameState)
+updateSprites gs@GameState{..} = gs
+    { _sprites = 
+        [ Sprite { spriteType = monsterSprite (_monsterType monster)
+                 , spritePos = (_monsterPos monster)
+                 } | monster <- _monsters 
         ]
     }
 
 
 monsterAI :: GameState -> Monster -> Monster
-monsterAI gameState whatMonster =
-  let
-    rotation =
-      if (monsterType whatMonster) == Zombie
-        then vectorAngle $ substractPairs (playerPos gameState) (monsterPos whatMonster)  -- zombie walks towards the player
+monsterAI gs whatMonster@Monster{..} =
+  let rotation = if _monsterType == Zombie
+        then vectorAngle $ substractPairs (_playerPos gs) _monsterPos  -- zombie walks towards the player
         else
-          if (countdownAI whatMonster) == 0
-            then angleTo02Pi ((fst (monsterPos whatMonster)) + (snd (monsterPos whatMonster)) + (fromIntegral (frameNumber gameState)) / 100.0)
-            else (monsterRot whatMonster)
+          if _countdownAI == 0
+            then angleTo02Pi $ (fst _monsterPos) + (snd _monsterPos) + (fromIntegral (_frameNumber gs)) / 100.0
+            else _monsterRot
   in
     whatMonster
-      {
-        monsterPos = moveWithCollision gameState (monsterPos whatMonster) (monsterRot whatMonster) (monsterStepLength (monsterType whatMonster))
-      }
-      {
-        monsterRot = rotation
-      }
-      {
-        countdownAI = 
-          if (countdownAI whatMonster) <= 0
-            then recomputeAIin
-            else (countdownAI whatMonster) - 1
+      { _monsterPos  = moveWithCollision gs _monsterPos _monsterRot (monsterStepLength _monsterType)
+      ,  _monsterRot = rotation
+      , _countdownAI = if _countdownAI <= 0
+            then recomputeAIin else _countdownAI  - 1
       }
     
 
 -- Runs the AI for each monster, updating their positions etc.
 updateMonsters :: GameState -> GameState
-updateMonsters gameState =
+updateMonsters gs@GameState{..} =
   if disableAI 
-     then gameState
-     else gameState { monsters =
-            [monsterAI gameState monster
-              | monster <- filter (\m -> (health m) > 0) (monsters gameState)] }
+     then gs
+     else gs { _monsters = [monsterAI gs monster | monster <- filter ((>0) . _health) _monsters] }
     
 
 moveWithCollision :: GameState -> Position2D -> Double -> Double -> Position2D
-moveWithCollision gameState positionFrom angle distance =
+moveWithCollision gs positionFrom angle distance =
   let
     plusX = cos angle * distance
     plusY = -1 * (sin angle * distance)
   in
     (
       (fst positionFrom) + 
-      if positionIsWalkable gameState ((fst positionFrom) + plusX,snd positionFrom)
+      if positionIsWalkable gs ((fst positionFrom) + plusX,snd positionFrom)
         then plusX
         else 0,
       
       (snd positionFrom) + 
-      if positionIsWalkable gameState (fst positionFrom,(snd positionFrom) + plusY)
+      if positionIsWalkable gs (fst positionFrom,(snd positionFrom) + plusY)
         then plusY
         else 0
     )
@@ -576,21 +521,21 @@ moveWithCollision gameState positionFrom angle distance =
 
 -- Moves player by given distance in given direction, with collisions.
 movePlayerInDirection :: GameState -> Double -> Double -> GameState
-movePlayerInDirection previousGameState angle distance =
+movePlayerInDirection pgs@GameState{..} angle distance =
   let
     plusX = cos angle * distance
     plusY = -1 * (sin angle * distance)
   in
-    previousGameState
+    pgs
       {
-        playerPos =
+        _playerPos =
           (
-            fst (playerPos previousGameState) + 
-            if positionIsWalkable previousGameState ((fst (playerPos previousGameState)) + plusX,snd (playerPos previousGameState))
+            fst _playerPos  + 
+            if positionIsWalkable pgs (fst _playerPos + plusX, snd _playerPos)
               then plusX
               else 0,
-            snd (playerPos previousGameState) + 
-            if positionIsWalkable previousGameState (fst (playerPos previousGameState),(snd (playerPos previousGameState)) + plusY)
+            snd _playerPos  + 
+            if positionIsWalkable pgs (fst _playerPos, snd _playerPos  + plusY)
               then plusY
               else 0
           )
@@ -599,83 +544,59 @@ movePlayerInDirection previousGameState angle distance =
 
 -- Moves the player forward by given distance, with collisions.
 movePlayerForward :: GameState -> Double -> GameState
-movePlayerForward previousGameState distance =
-  previousGameState
+movePlayerForward pgs@GameState{..} distance =
+ pgs 
     {
-      playerPos = moveWithCollision previousGameState (playerPos previousGameState) (playerRot previousGameState) distance
+      _playerPos = moveWithCollision pgs _playerPos _playerRot  distance
     }
 
 
 -- Strafes the player left by given distance (with collisions).
 strafePlayer :: GameState -> Double -> GameState
-strafePlayer previousGameState distance =
-  previousGameState
+strafePlayer pgs@GameState{..} distance =
+  pgs
     {
-      playerPos = moveWithCollision previousGameState (playerPos previousGameState) (angleTo02Pi ((playerRot previousGameState) + pi / 2)) distance
+      _playerPos = moveWithCollision pgs _playerPos (angleTo02Pi (_playerRot + pi / 2)) distance
     }
 
 
 fire :: GameState -> GameState
-fire gameState =
-  if (fireCountdown gameState) == 0
+fire gs@GameState{..} =
+  if _fireCountdown  == 0
     then
-      gameState
+      gs
         { 
-          fireCountdown = weaponFireRate (currentWeapon gameState)
+          _fireCountdown = weaponFireRate _currentWeapon 
         }
         {
-          monsters =
+          _monsters =
             filter
-              (\m -> (health m) > 0)
-
+              ((>0) . _health)
               (
                 map
                   (\m ->
                     let
-                      angleDifference = abs $ angleAngleDifference (playerRot gameState) (vectorAngle $ substractPairs (monsterPos m) (playerPos gameState))
-                      monsterDistance = pointPointDistance (playerPos gameState) (monsterPos m)
+                      angleDifference = abs $ angleAngleDifference _playerRot  (vectorAngle $ substractPairs (_monsterPos m) _playerPos )
+                      monsterDistance = pointPointDistance _playerPos (_monsterPos m)
                       angleRange = 1.0 / (monsterDistance + aimAccuracy)
-                      wallDistance = fst $ castRay gameState (playerPos gameState) (floorPair (playerPos gameState)) (playerRot gameState) maxRaycastIterations
-                      maxDistance = if (currentWeapon gameState) == Knife then knifeAttackDistance else infinity
+                      wallDistance = fst $ castRay gs _playerPos  (floorPair _playerPos ) _playerRot  maxRaycastIterations
+                      maxDistance = if _currentWeapon == Knife then knifeAttackDistance else infinity
                       hit = angleDifference < angleRange / 2 && monsterDistance <= wallDistance && monsterDistance <= maxDistance
                     in
-                      m
-                        {
-                          health = if hit then (health m) - weaponDamage else (health m) 
-                        }
+                      m { _health = if hit then (_health m) - weaponDamage else (_health m)}
                   )
-            
-                (monsters gameState)
+                _monsters 
               )
         }
-    else gameState
+    else gs
   
+
 -- Computes the next game state.
-nextGameState :: GameState -> Char -> GameState
-nextGameState previousGameState inputChar =
-  let
-    newGameState =
-      case () of _ -- case with expressions hack
-                   | inputChar == keyForward     -> movePlayerForward previousGameState stepLength
-                   | inputChar == keyBackward    -> movePlayerForward previousGameState (-1 * stepLength)
-                   | inputChar == keyTurnLeft    -> previousGameState { playerRot = angleTo02Pi ((playerRot previousGameState) + rotationStep) }
-                   | inputChar == keyTurnRight   -> previousGameState { playerRot = angleTo02Pi ((playerRot previousGameState) - rotationStep) }
-                   | inputChar == keyStrafeLeft  -> strafePlayer previousGameState stepLength
-                   | inputChar == keyStrafeRight -> strafePlayer previousGameState (-1 * stepLength)
-                   | inputChar == keyFire        -> fire previousGameState
-                   | inputChar == keyWeapon1     -> previousGameState { currentWeapon = Knife }
-                   | inputChar == keyWeapon2     -> previousGameState { currentWeapon = Gun }
-                   | inputChar == keyWeapon3     -> previousGameState { currentWeapon = Uzi }
-                   | otherwise                   -> previousGameState
-  in
-    (
-      updateMonsters $ updateSprites newGameState
-    )
-    {
-      frameNumber = (frameNumber newGameState) + 1
-    }
-    {
-      fireCountdown = max ((fireCountdown newGameState) - 1) 0
+nextGameState :: GameState -> GameState
+nextGameState gs@GameState{..}  =
+    (updateMonsters $ updateSprites gs)
+    { _frameNumber = _frameNumber + 1
+    , _fireCountdown = max (_fireCountdown - 1) 0
     }
 
 
@@ -697,15 +618,27 @@ getLastChar = do
         return ' '
     
 
+inputHandler :: GameState -> Char -> GameState
+inputHandler gs@GameState{..} c  
+  | c == keyForward     = movePlayerForward gs stepLength
+  | c == keyBackward    = movePlayerForward gs (-1 * stepLength)
+  | c == keyTurnLeft    = gs { _playerRot = angleTo02Pi (_playerRot + rotationStep) }
+  | c == keyTurnRight   = gs { _playerRot = angleTo02Pi (_playerRot - rotationStep) }
+  | c == keyStrafeLeft  = strafePlayer gs stepLength
+  | c == keyStrafeRight = strafePlayer gs (-1 * stepLength)
+  | c == keyFire        = fire gs
+  | c == keyWeapon1     = gs { _currentWeapon = Knife }
+  | c == keyWeapon2     = gs { _currentWeapon = Gun }
+  | c == keyWeapon3     = gs { _currentWeapon = Uzi }
+  | otherwise           = gs
+
+
 gameLoop :: GameState -> IO ()
-gameLoop gameState =
+gameLoop gs =
   do
     t1 <- getCPUTime
-    
-    putStrLn (emptyLineString ++ renderGameState gameState)
-    
+    putStrLn (emptyLineString ++ renderGameState gs)
     c <- getLastChar
-    
     t2 <- getCPUTime
     threadDelay (frameDelayUs - ( (fromIntegral (t2 - t1)) `div` 1000000) ) -- wait for the rest of frame time
     
@@ -716,7 +649,9 @@ gameLoop gameState =
     
     if c == keyQuit
       then do putStrLn "quitting"
-      else do gameLoop (nextGameState gameState c)
+      else do 
+          let newState = inputHandler gs c 
+          gameLoop (nextGameState newState )
       
         
 gameMain :: IO ()
@@ -725,4 +660,5 @@ gameMain = do
     hSetBuffering stdout (BlockBuffering (Just 20000))  -- to read flickering
     hSetEcho stdout False                               
     gameLoop initialGameState
+
 

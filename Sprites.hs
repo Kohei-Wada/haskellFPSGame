@@ -8,6 +8,7 @@ data Sprite = Sprite
   } deriving (Show)
  
 
+
 type SpriteType = Int
 spriteNone    = -1 :: Int
 spriteTree    = 0 :: Int
