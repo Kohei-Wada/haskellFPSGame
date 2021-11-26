@@ -9,6 +9,7 @@ import Types
 import Monster
 import GameMap 
 import Weapon
+import Player
 
 
 import System.IO
@@ -22,6 +23,7 @@ import Data.List
 
 data Normal = NormalNorth | NormalWest | NormalSouth | NormalEast deriving(Show, Eq)
 
+--TODO Separate the Player from the GameState
 data GameState = GameState
   { _playerPos     :: Position2D
   , _playerRot     :: Double            -- rotation in radians, CCW, 0 = facing right
@@ -254,12 +256,12 @@ renderGameState gs@GameState{..} =
 -- Renders the game state into string, simple version.
 renderMap :: GameState -> String
 renderMap gs@GameState{..} =
-  concat ( map
+  concat (map
         (   
           \square ->
-            ( if mod (snd square) (fst mapSize) == 0 then "\n" else "")
+            (if mod (snd square) (fst mapSize) == 0 then "\n" else "")
             ++
-            ( if floor (fst _playerPos) == fst (arrayToMapCoords (snd square)) &&
+            (if floor (fst _playerPos) == fst (arrayToMapCoords (snd square)) &&
                  floor (snd _playerPos) == snd (arrayToMapCoords (snd square))
                     then
                         case round (4.0 * _playerRot / pi)  of
@@ -345,6 +347,7 @@ castRaySquare squareCoords rayPosition rayAngle =
 
 
 
+--TODO Encapsulate the sprites inside a monster.
 -- Creates sprites and places them on the map depending on current state of things.
 updateSprites ::  [Monster] -> [Sprite]
 updateSprites ms = map (\m -> Sprite { spriteType = monsterSprite (_monsterType m)
