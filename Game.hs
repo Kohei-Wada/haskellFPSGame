@@ -407,14 +407,24 @@ strafePlayer gs@GameState{..} distance =
   gs { _playerPos = moveWithCollision _gameMap _playerPos (angleTo02Pi (_playerRot + pi / 2)) distance }
 
 
+
+wallDistance gmap pPos pRot= fst $ castRay gmap pPos  (floorPair pPos) pRot maxRaycastIterations
+
+
+monsterDistance pPos m@Monster{..} = pointPointDistance pPos _monsterPos
+
+maxDistance gs@GameState{..} = if _currentWeapon == Knife then knifeAttackDistance else infinity
+
+
 fireIsHit :: GameState -> Monster -> Bool
-fireIsHit gs@GameState{..} m =  
-    let angleDifference = abs $ angleAngleDifference _playerRot  (vectorAngle $ substractPairs (_monsterPos m) _playerPos )
-        monsterDistance = pointPointDistance _playerPos (_monsterPos m)
-        angleRange      = 1.0 / (monsterDistance + aimAccuracy)
-        wallDistance    = fst $ castRay _gameMap _playerPos  (floorPair _playerPos ) _playerRot maxRaycastIterations
-        maxDistance     = if _currentWeapon == Knife then knifeAttackDistance else infinity
-     in angleDifference < angleRange / 2 && monsterDistance <= wallDistance && monsterDistance <= maxDistance
+fireIsHit gs@GameState{..} m@Monster{..} =  
+    let angleDifference = abs $ angleAngleDifference _playerRot (vectorAngle $ substractPairs _monsterPos _playerPos )
+        md              = monsterDistance _playerPos m
+        angleRange      = 1.0 / (md + aimAccuracy)
+        wd              = wallDistance _gameMap _playerPos _playerRot
+        maxd = maxDistance gs 
+     in angleDifference < angleRange / 2 && md <= wd && md <= maxd
+
 
 
 updateMonsterByfire :: GameState -> Monster -> Monster
