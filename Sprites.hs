@@ -3,8 +3,8 @@ module Sprites where
 import Types
 
 data Sprite = Sprite
-  { spriteType :: SpriteType
-  , spritePos  :: Position2D
+  { _spriteType :: SpriteType
+  , _spritePos  :: Position2D
   } deriving (Show)
  
 
