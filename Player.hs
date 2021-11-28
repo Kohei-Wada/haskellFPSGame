@@ -5,6 +5,7 @@ import Types
 import Utils
 import Options
 import GameMap
+import Weapon
 
 
 data Player = Player 
@@ -45,8 +46,6 @@ movePlayerForward p@Player{..} gmap distance =
     p { _playerPos = moveWithCollision gmap _playerPos _playerRot distance}
 
 
-
-
 --TODO
 movePlayerInDirection' :: Player -> GameMap -> Double -> Double -> Player
 movePlayerInDirection' p@Player{..} gmap angle distance =
@@ -65,4 +64,5 @@ movePlayerInDirection' p@Player{..} gmap angle distance =
               then plusY else 0
           )
       }
+
 

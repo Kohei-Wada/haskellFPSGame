@@ -21,7 +21,6 @@ import System.CPUTime
 import Data.List
 
 
-
 --TODO Separate the Player from the GameState
 data GameState = GameState
   { _player        :: Player
@@ -234,7 +233,7 @@ overlay background foreground position backgroundResolution foregroundResolution
 -- Renders the game in 3D.
 renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
-  let wallDrawInfo = castRays gs
+  let wallDrawInfo = castRays _player _gameMap
       gunSprite = weaponSprite _currentWeapon  +
         if _fireCountdown /= 0 then 1 else 0
   in
@@ -285,15 +284,13 @@ distanceToProjectionPlane focalDistance angleFromCenter = focalDistance * (cos a
 
 
 -- Casts all rays needed to render player's view, returns a list of ray cast results.
-castRays :: GameState -> [(Double, Normal)]
-castRays gs@GameState{..} =
+castRays :: Player -> GameMap -> [(Double, Normal)]
+castRays p@Player{..} gmap =
   [
-    let
-      rayDirection = (_playerRot _player) + fieldOfView / 2 - (fromIntegral x) * rayAngleStep
-      rayResult = castRay _gameMap  (_playerPos _player) (floorPair (_playerPos _player)) rayDirection maxRaycastIterations
-    in
-      (
-        max ((fst rayResult) - (distanceToProjectionPlane focalLength (abs $ (_playerRot _player) - rayDirection))) 0.0
+    let rayDirection = _playerRot + fieldOfView / 2 - (fromIntegral x) * rayAngleStep
+        rayResult = castRay gmap _playerPos (floorPair _playerPos) rayDirection maxRaycastIterations
+    in (
+        max ((fst rayResult) - (distanceToProjectionPlane focalLength (abs $ _playerRot  - rayDirection))) 0.0
         ,
         snd rayResult
       )
@@ -395,14 +392,17 @@ inputHandler :: GameState -> Char -> GameState
 inputHandler gs@GameState{..} c  
   | c == keyForward     = gs { _player = movePlayerForward _player _gameMap stepLength } 
   | c == keyBackward    = gs { _player = movePlayerForward _player _gameMap (-1 * stepLength) } 
-  | c == keyTurnLeft    = gs { _player  = turnLeft _player}
+  | c == keyTurnLeft    = gs { _player = turnLeft _player}
   | c == keyTurnRight   = gs { _player = turnRight _player}
   | c == keyStrafeLeft  = gs { _player = strafePlayer _player _gameMap  stepLength }
   | c == keyStrafeRight = gs { _player = strafePlayer _player _gameMap  (-1 * stepLength) }
-  | c == keyFire        = fire gs
+
   | c == keyWeapon1     = gs { _currentWeapon = Knife }
   | c == keyWeapon2     = gs { _currentWeapon = Gun }
   | c == keyWeapon3     = gs { _currentWeapon = Uzi }
+
+  | c == keyFire        = fire gs
+
   | otherwise           = gs
 
 
@@ -426,7 +426,6 @@ gameLoop gs =
           let newState = inputHandler gs c 
           gameLoop (nextGameState newState )
       
-
         
 gameMain :: IO ()
 gameMain = do
