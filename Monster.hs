@@ -15,7 +15,7 @@ data MonsterType = Zombie | Demon deriving(Show, Eq)
 data Monster = Monster
   { _monsterType :: MonsterType
   , _monsterPos  :: Position2D
-  , _health      :: Int
+  , _hp          :: Int
   , _countdownAI :: Int
   , _monsterRot  :: Double
   } deriving (Show)
@@ -25,7 +25,7 @@ newMonster :: MonsterType -> Position2D -> Monster
 newMonster monsterType initialPosition = Monster
   { _monsterType = monsterType
   , _monsterPos  = initialPosition
-  , _health      = if monsterType == Zombie then monsterHealthZombie else monsterHealthDemon
+  , _hp          = if monsterType == Zombie then monsterHealthZombie else monsterHealthDemon
   , _countdownAI = 0
   , _monsterRot  = 0
   }
@@ -45,7 +45,7 @@ mStepLen monsterId
 
 monsterDamaged :: Monster -> Int -> Monster
 monsterDamaged m@Monster{..} damage = 
-    m { _health = _health - damage }
+    m { _hp = _hp - damage }
 
 
 --TODO
@@ -76,4 +76,7 @@ monsterDistance m@Monster{..} p@Player{..} = pointPointDistance _monsterPos _pla
 monsterAngleDiff :: Monster -> Player -> Double
 monsterAngleDiff m@Monster{..} p@Player{..} = 
      abs $ angleAngleDifference _playerRot (vectorAngle $ substractPairs _monsterPos _playerPos)
+
+
+
 

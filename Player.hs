@@ -73,3 +73,8 @@ attackRange p@Player{..} = if _weapon == Knife then knifeAttackDistance else inf
 weaponSprite :: Player -> Int
 weaponSprite p@Player{..} = weaponSprite' _weapon + if _fireCountdown /= 0 then 1 else 0
 
+
+resetFireCount :: Player -> Player
+resetFireCount p@Player{..} = p { _fireCountdown = weaponFireRate _weapon }
+
+

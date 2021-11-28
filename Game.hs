@@ -146,8 +146,7 @@ render3Dview wallMap spriteMap height frameNumber =
                   columnHeight = floor ((distanceToSize distance) * heightDouble)
                   spriteInfo = (snd item)
                   
-                  wallSample =
-                    if absDistanceFromMiddle < columnHeight
+                  wallSample = if absDistanceFromMiddle < columnHeight
                       then
                         if normal == NormalNorth then      intensityToChar $ 0.25 + distanceToIntensity distance
                         else if normal == NormalEast then  intensityToChar $ 0.50 + distanceToIntensity distance
@@ -203,7 +202,7 @@ overlay background foreground position backgroundResolution foregroundResolution
             take (fst position) (snd item) ++
               [
                 if (fst chars) == transparentChar then (snd chars) else (fst chars)
-                | chars  <- zip (fst item) ( take (fst foregroundResolution)  (drop (fst position) (snd item)))
+                | chars <- zip (fst item) (take (fst foregroundResolution) (drop (fst position) (snd item)))
               ] ++
             drop (fst position + fst foregroundResolution) (snd item)
             | item <- zip (splitChunks (fst foregroundResolution) foreground) secondLines
@@ -217,17 +216,16 @@ renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
       gunSprite    = weaponSprite _player
-   in
-    (overlay
+   in (overlay
         (render3Dview wallDrawInfo (projectSprites gs) (snd viewSize) _frameNumber)
         (concat (spriteList !! gunSprite))
         weaponSpritePosition
         (addPairs viewSize (1,0))
         spriteSize
         transparentChar
-    )
-    ++
-    renderInfoBar gs 
+      )
+      ++
+      renderInfoBar gs 
     
 
 -- Renders the game state into string, simple version.
@@ -291,29 +289,30 @@ updateMonsters :: [Monster] -> Player -> GameMap -> Int -> [Monster]
 updateMonsters ms p@Player{..} gmap frameNum =
   if disableAI 
      then ms 
-     else map (\m -> updateMonster m p gmap frameNum) $ filter ((>0) . _health) ms
+     else map (\m -> updateMonster m p gmap frameNum) $ filter ((>0) . _hp) ms
 
 
-fireIsHit :: Monster -> Player -> GameMap-> Bool
-fireIsHit m p gmap =  
-    let angleDiff  = monsterAngleDiff m p
-        md         = monsterDistance m p
-        angleRange = 1.0 / (md + aimAccuracy)
-        wd         = wallDistance p gmap 
-        atkRange   = attackRange p
-     in angleDiff < angleRange / 2 && md <= wd && md <= atkRange
+updateMonsterByfire :: Monster -> Player -> GameMap -> Monster
+updateMonsterByfire m p gmap = 
+     if angleDiff < angleRange / 2 && md <= wd && md <= atkRange 
+        then monsterDamaged m weaponDamage else m
+            where angleDiff  = monsterAngleDiff m p
+                  md         = monsterDistance m p 
+                  angleRange = 1.0 / (md + aimAccuracy)
+                  wd         = wallDistance p gmap
+                  atkRange   = attackRange p
 
 
-updateMonsterByfire :: GameState -> Monster -> Monster
-updateMonsterByfire gs@GameState{..} m = 
-    if fireIsHit m _player _gameMap then monsterDamaged m weaponDamage else m
+updateMonstersByfire :: [Monster] -> Player -> GameMap -> [Monster]
+updateMonstersByfire ms p gmap = 
+    filter ((>0) . _hp) $ map (\m -> updateMonsterByfire m p gmap) ms
 
 
 fire :: GameState -> GameState
 fire gs@GameState{..} =
-  if _fireCountdown _player  == 0
-    then gs { _player = _player { _fireCountdown = weaponFireRate (_weapon _player) }
-            , _monsters = filter ((>0) . _health) $ map (updateMonsterByfire gs) _monsters
+  if _fireCountdown _player == 0
+    then gs { _player   = resetFireCount _player 
+            , _monsters = updateMonstersByfire _monsters _player _gameMap
             }
     else gs
 
