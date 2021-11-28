@@ -13,8 +13,8 @@ weaponFireRate weaponId
   | otherwise         = 1
  
 
-weaponSprite :: Weapon -> Int
-weaponSprite weaponId
+weaponSprite' :: Weapon -> Int
+weaponSprite' weaponId
   | weaponId == Knife = spriteFPKnife
   | weaponId == Gun   = spriteFPGun
   | weaponId == Uzi   = spriteFPUzi

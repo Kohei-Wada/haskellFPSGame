@@ -23,13 +23,11 @@ import Data.List
 data GameState = GameState
   { _player        :: Player
   , _frameNumber   :: Int
-  , _currentWeapon :: Weapon
   , _currentLevel  :: Int
   , _currentScore  :: Int
   , _gameMap       :: GameMap
   , _monsters      :: [Monster] -- list of monsters
   , _sprites       :: [Sprite]  -- list of sprites
-  , _fireCountdown :: Int       -- counter for implementing different fire rates
   } deriving (Show)
  
 
@@ -37,7 +35,6 @@ initialGameState :: GameState
 initialGameState = GameState
   { _player        = initialPlayer
   , _frameNumber   = 0
-  , _currentWeapon = Knife
   , _currentLevel  = 1
   , _currentScore  = 0
   , _gameMap       = gameMap1
@@ -48,7 +45,6 @@ initialGameState = GameState
       , newMonster Demon (2,10)
       ]
   , _sprites       = []
-  , _fireCountdown = 0
   }
 
 
@@ -220,7 +216,7 @@ overlay background foreground position backgroundResolution foregroundResolution
 renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
-      gunSprite    = weaponSprite _currentWeapon + if _fireCountdown /= 0 then 1 else 0
+      gunSprite    = weaponSprite _player
    in
     (overlay
         (render3Dview wallDrawInfo (projectSprites gs) (snd viewSize) _frameNumber)
@@ -298,29 +294,25 @@ updateMonsters ms p@Player{..} gmap frameNum =
      else map (\m -> updateMonster m p gmap frameNum) $ filter ((>0) . _health) ms
 
 
-monsterDistance pPos m@Monster{..} = pointPointDistance pPos _monsterPos
-
-maxDistance gs@GameState{..} = if _currentWeapon == Knife then knifeAttackDistance else infinity
-
-
-fireIsHit :: GameState -> Monster -> Bool
-fireIsHit gs@GameState{..} m@Monster{..} =  
-    let angleDiff = abs $ angleAngleDifference (_playerRot _player) (vectorAngle $ substractPairs _monsterPos (_playerPos _player))
-        md          = monsterDistance (_playerPos _player) m
-        angleRange  = 1.0 / (md + aimAccuracy)
-        wd          = wallDistance _player _gameMap
-        maxd        = maxDistance gs 
-     in angleDiff < angleRange / 2 && md <= wd && md <= maxd
+fireIsHit :: Monster -> Player -> GameMap-> Bool
+fireIsHit m p gmap =  
+    let angleDiff  = monsterAngleDiff m p
+        md         = monsterDistance m p
+        angleRange = 1.0 / (md + aimAccuracy)
+        wd         = wallDistance p gmap 
+        atkRange   = attackRange p
+     in angleDiff < angleRange / 2 && md <= wd && md <= atkRange
 
 
 updateMonsterByfire :: GameState -> Monster -> Monster
-updateMonsterByfire gs m = if fireIsHit gs m then monsterDamaged m weaponDamage else m
+updateMonsterByfire gs@GameState{..} m = 
+    if fireIsHit m _player _gameMap then monsterDamaged m weaponDamage else m
 
 
 fire :: GameState -> GameState
 fire gs@GameState{..} =
-  if _fireCountdown  == 0
-    then gs { _fireCountdown = weaponFireRate _currentWeapon 
+  if _fireCountdown _player  == 0
+    then gs { _player = _player { _fireCountdown = weaponFireRate (_weapon _player) }
             , _monsters = filter ((>0) . _health) $ map (updateMonsterByfire gs) _monsters
             }
     else gs
@@ -329,10 +321,10 @@ fire gs@GameState{..} =
 -- Computes the next game state.
 nextGameState :: GameState -> GameState
 nextGameState gs@GameState{..}  =
-    gs { _frameNumber   = _frameNumber + 1
-       , _fireCountdown = max (_fireCountdown - 1) 0
-       , _monsters      = updateMonsters _monsters _player _gameMap _frameNumber
-       , _sprites       = updateSprites _monsters
+    gs { _frameNumber = _frameNumber + 1
+       , _player      = updateFireCountDown _player
+       , _monsters    = updateMonsters _monsters _player _gameMap _frameNumber
+       , _sprites     = updateSprites _monsters
        }
 
 
@@ -361,9 +353,9 @@ inputHandler gs@GameState{..} c
   | c == keyTurnRight   = gs { _player = turnRight _player}
   | c == keyStrafeLeft  = gs { _player = strafePlayer _player _gameMap  stepLength }
   | c == keyStrafeRight = gs { _player = strafePlayer _player _gameMap  (-1 * stepLength) }
-  | c == keyWeapon1     = gs { _currentWeapon = Knife }
-  | c == keyWeapon2     = gs { _currentWeapon = Gun }
-  | c == keyWeapon3     = gs { _currentWeapon = Uzi }
+  | c == keyWeapon1     = gs { _player = changeWeapon _player Knife }
+  | c == keyWeapon2     = gs { _player = changeWeapon _player Gun }
+  | c == keyWeapon3     = gs { _player = changeWeapon _player Uzi }
   | c == keyFire        = fire gs
   | otherwise           = gs
 

@@ -69,4 +69,11 @@ updateMonster m@Monster{..} p@Player{..} gmap frameNum=
       }
 
 
+monsterDistance :: Monster -> Player -> Double
+monsterDistance m@Monster{..} p@Player{..} = pointPointDistance _monsterPos _playerPos
+
+
+monsterAngleDiff :: Monster -> Player -> Double
+monsterAngleDiff m@Monster{..} p@Player{..} = 
+     abs $ angleAngleDifference _playerRot (vectorAngle $ substractPairs _monsterPos _playerPos)
 
