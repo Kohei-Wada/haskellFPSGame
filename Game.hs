@@ -51,18 +51,17 @@ initialGameState = GameState
 -- projects one sprite (sprite,x,y) to a screen list [(sprite id,sprite x pixel,distance)]
 projectSprite :: (SpriteType,Double,Double) -> [(SpriteType,Int,Double)] -> [(SpriteType,Int,Double)]  
 projectSprite spriteInfo screenList = -- projects a single sprite to screen list
-    let spritePos = (snd3 spriteInfo) * fromIntegral ((length screenList) - 1)
-        spriteLength = (distanceToSize (thd3 spriteInfo)) * fromIntegral (fst spriteSize) * spriteScale
-        spriteInterval = (floor (spritePos - spriteLength / 2) , floor (spritePos + spriteLength / 2) )
+    let spritePos      = (snd3 spriteInfo) * fromIntegral ((length screenList) - 1)
+        spriteLength   = (distanceToSize (thd3 spriteInfo)) * fromIntegral (fst spriteSize) * spriteScale
+        spriteInterval = (floor (spritePos - spriteLength / 2) , floor (spritePos + spriteLength / 2))
 
-     in map (\item -> if (snd item) >= (fst spriteInterval) && (snd item) <= (snd spriteInterval)
+     in map (\(spX, spY) -> if spY >= (fst spriteInterval) && spY <= (snd spriteInterval)
                 then
-                  (
-                    (fst3 spriteInfo),
-                    round $ ((fromIntegral((snd item) - (fst spriteInterval))) / spriteLength) * fromIntegral ((fst spriteSize) - 1),
-                    (thd3 spriteInfo)
+                  ( (fst3 spriteInfo)
+                  , round $ ((fromIntegral(spY - (fst spriteInterval))) / spriteLength) * fromIntegral ((fst spriteSize) - 1)
+                  , (thd3 spriteInfo)
                   )
-                else (fst item)
+                else spX 
           )
           (zip screenList [0..])
 
@@ -77,8 +76,8 @@ projectSprites sps p@Player{..} =
         -- [(sprite id,sprite x pixel,distance)]
         screenspaceSprites = 
           [
-            ( spType 
             -- sprite center in screenspace, normalized
+            ( spType 
             , 0.5 + (angleDifference _playerRot (vectorAngle (spx - fst _playerPos, spy - snd _playerPos))) / fieldOfView
 
             , (pointDistance _playerPos spPos) - spriteDepthBias   -- sprite distance
@@ -112,34 +111,32 @@ render3Dview wallMap spriteMap height frameNumber =
          in map
             (
               \item ->
-                let                  
-                  normal = (snd (fst item))
-                  distance = (fst (fst item))
-                  columnHeight = floor ((distanceToSize distance) * heightDouble)
-                  spriteInfo = (snd item)
-                  
-                  wallSample = if absDistanceFromMiddle < columnHeight
-                      then
-                        if normal == NormalNorth then      intensityToChar $ 0.25 + distanceToIntensity distance
-                        else if normal == NormalEast then  intensityToChar $ 0.50 + distanceToIntensity distance
-                        else if normal == NormalSouth then intensityToChar $ 0.75 + distanceToIntensity distance
-                        else                               intensityToChar $ 1.00 + distanceToIntensity distance
-                      else backgroundChar
-                  
-                  spriteHalfHeight = floor ( spriteScale * distanceToSize (thd3 spriteInfo) * fromIntegral (snd spriteSize) / 2 )
-                  sampleX = snd3 spriteInfo
-                  sampleY = round (((1 - (1 + (fromIntegral distanceFromMiddle) / (fromIntegral spriteHalfHeight)) / 2)) * fromIntegral ((snd spriteSize) - 1))
-                  spriteSample = sampleSprite (fst3 spriteInfo) (sampleX,sampleY) (animationFrameForSprite (fst3 spriteInfo) frameNumber)
-                in
-                  if (thd3 spriteInfo) >= distance                  -- is wall closer than sprite?
-                    then wallSample                                 
-                    else                                            -- sprite is closer  
-                      if absDistanceFromMiddle <= spriteHalfHeight  
-                        then
-                          if spriteSample /= transparentChar
-                            then spriteSample
+                  let normal       = (snd (fst item))
+                      distance     = (fst (fst item))
+                      columnHeight = floor ((distanceToSize distance) * heightDouble)
+                      spriteInfo   = (snd item)
+                      wallSample   = if absDistanceFromMiddle < columnHeight
+                          then 
+                            if normal      == NormalNorth then intensityToChar $ 0.25 + distanceToIntensity distance
+                            else if normal == NormalEast  then intensityToChar $ 0.50 + distanceToIntensity distance
+                            else if normal == NormalSouth then intensityToChar $ 0.75 + distanceToIntensity distance
+                            else                               intensityToChar $ 1.00 + distanceToIntensity distance
+                          else backgroundChar
+                      
+                      spriteHalfHeight = floor ( spriteScale * distanceToSize (thd3 spriteInfo) * fromIntegral (snd spriteSize) / 2 )
+                      sampleX          = snd3 spriteInfo
+                      sampleY          = round (((1 - (1 + (fromIntegral distanceFromMiddle) / (fromIntegral spriteHalfHeight)) / 2)) * fromIntegral ((snd spriteSize) - 1))
+                      spriteSample     = sampleSprite (fst3 spriteInfo) (sampleX,sampleY) (animationFrameForSprite (fst3 spriteInfo) frameNumber)
+
+                  in if (thd3 spriteInfo) >= distance -- is wall closer than sprite?
+                        then wallSample                                 
+                        else  -- sprite is closer  
+                          if absDistanceFromMiddle <= spriteHalfHeight  
+                            then
+                              if spriteSample /= transparentChar
+                                then spriteSample
+                                else wallSample
                             else wallSample
-                        else wallSample
             )
             (zip wallMap spriteMap) ++ "\n"
         | i <- [1..height]
@@ -242,12 +239,10 @@ castRays :: Player -> GameMap -> [(Double, Normal)]
 castRays p@Player{..} gmap =
   [
     let rayDirection = _playerRot + fieldOfView / 2 - (fromIntegral x) * rayAngleStep
-        rayResult = castRay gmap _playerPos (floorPair _playerPos) rayDirection maxRaycastIterations
-    in (
-        max ((fst rayResult) - (distanceToProjectionPlane focalLength (abs $ _playerRot - rayDirection))) 0.0
-        ,
-        snd rayResult
-      )
+        (rayX, rayY) = castRay gmap _playerPos (floorPair _playerPos) rayDirection maxRaycastIterations
+     in ( max (rayX - (distanceToProjectionPlane focalLength (abs $ _playerRot - rayDirection))) 0.0
+        , rayY
+        )
     | x <- [0..(fst viewSize) - 1]
   ]
 
@@ -260,8 +255,9 @@ distanceToProjectionPlane focalDistance angleFromCenter = focalDistance * (cos a
 --TODO Encapsulate the sprites inside a monster.
 -- Creates sprites and places them on the map depending on current state of things.
 updateSprites ::  [Monster] -> [Sprite]
-updateSprites ms = map (\m -> Sprite { _spriteType = monsterSprite (_monsterType m)
-                                     , _spritePos  = (_monsterPos m)}) ms  
+updateSprites ms = 
+    map (\m -> Sprite { _spriteType = monsterSprite (_monsterType m)
+                      , _spritePos  = (_monsterPos m)}) ms  
    
 
 fire :: GameState -> GameState
@@ -320,9 +316,10 @@ gameLoop :: GameState -> IO ()
 gameLoop gs = do
     t1 <- getCPUTime
     putStrLn (emptyLineString ++ renderGameState gs)
-    c <- getLastChar
+    c  <- getLastChar
     t2 <- getCPUTime
-    threadDelay (frameDelayUs - ( (fromIntegral (t2 - t1)) `div` 1000000) ) -- wait for the rest of frame time
+    threadDelay (frameDelayUs - ((fromIntegral (t2 - t1)) `div` 1000000)) 
+    -- wait for the rest of frame time
     
 --  t3 <- getCPUTime
 --  putStrLn (show (fromIntegral (t3 - t1) / 10e9) ++ " ms")  -- for profiling, comment out otherwise

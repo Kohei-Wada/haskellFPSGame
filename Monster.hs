@@ -58,7 +58,6 @@ nextMonsterRot m@Monster{..} targetPos frameNum =
                 (fst _monsterPos) + (snd _monsterPos) + (fromIntegral frameNum) / 100.0
             else _monsterRot
 
-
 --TODO
 updateMonster :: Monster -> Player -> GameMap -> Int -> Monster
 updateMonster m@Monster{..} p@Player{..} gmap frameNum=

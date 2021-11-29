@@ -83,25 +83,17 @@ distanceToSize distance = 1.0 / (distance + 1.0)
 
 
 moveWithCollision :: GameMap -> Position2D -> Double -> Double -> Position2D
-moveWithCollision gmap positionFrom angle distance =
-  let
-    plusX = cos angle * distance
-    plusY = -1 * (sin angle * distance)
-  in
-    (
-      fst positionFrom + 
-      if positionIsWalkable gmap (fst positionFrom + plusX, snd positionFrom)
-        then plusX else 0
-        ,
-      snd positionFrom + 
-      if positionIsWalkable gmap (fst positionFrom, snd positionFrom + plusY)
-        then plusY else 0
-    )
+moveWithCollision gmap (pX, pY) angle distance = 
+    let plusX = cos angle * distance
+        plusY = -1 * (sin angle * distance)
+     in ( pX + if positionIsWalkable gmap (pX + plusX, pY)  then plusX else 0
+        , pY + if positionIsWalkable gmap (pX , pY + plusY) then plusY else 0
+        )
 
 -- Returns map square at given coords.
 mapSquareAt :: GameMap -> (Int, Int) -> MapSquare
-mapSquareAt gmap coords 
-  | (fst coords) < (fst mapSize) && (fst coords) >= 0 && (snd coords) < (snd mapSize) && (snd coords) >= 0 = gmap !! (mapToArrayCoords coords)
+mapSquareAt gmap coords@(cX, cY) 
+  | (fst coords) < (fst mapSize) && cX >= 0 && cY < (snd mapSize) && cY >= 0 = gmap !! (mapToArrayCoords coords)
   | otherwise = SquareWall
 
 
@@ -110,31 +102,30 @@ positionIsWalkable :: GameMap -> Position2D -> Bool
 positionIsWalkable gmap position =
   (mapSquareAt gmap (floorPair position)) == SquareEmpty
  
+
 -- Casts a ray and returns an information (distance, normal) about a wall it hits.
 castRay :: GameMap -> Position2D -> (Int, Int) -> Double -> Int ->  (Double, Normal)
 castRay gmap rayOrigin square rayDirection maxIterations =
-  let
-    squareCoords = floorPair rayOrigin
-    angle = angleTo02Pi rayDirection
-  in
-    if (mapSquareAt gmap square) /= SquareEmpty || maxIterations == 0
-      then (0, NormalNorth)
-      else
-        let
-          squareCastResult = castRaySquare square rayOrigin angle
-          recursionResult = castRay gmap (fst squareCastResult) (addPairs square (snd squareCastResult)) angle (maxIterations - 1)
-        in
-          (
-            pointDistance rayOrigin (fst squareCastResult) + (fst recursionResult),
-            if (fst recursionResult) /= 0
-              then (snd recursionResult)
-              else
-                case (snd squareCastResult) of
-                  (1,0)  -> NormalEast
-                  (0,1)  -> NormalSouth
-                  (-1,0) -> NormalWest
-                  _      -> NormalNorth
-          )
+  let squareCoords = floorPair rayOrigin
+      angle = angleTo02Pi rayDirection
+   in if (mapSquareAt gmap square) /= SquareEmpty || maxIterations == 0
+         then (0, NormalNorth)
+          else
+            let
+              (sqCastResX, sqCastResY) = castRaySquare square rayOrigin angle
+              (recResX, recResY) = castRay gmap sqCastResX (addPairs square sqCastResY) angle (maxIterations - 1)
+            in
+              (
+                pointDistance rayOrigin sqCastResX + recResX,
+                if recResX /= 0
+                  then recResY
+                  else
+                    case sqCastResY of
+                      (1, 0)  -> NormalEast
+                      (0, 1)  -> NormalSouth
+                      (-1, 0) -> NormalWest
+                      _       -> NormalNorth
+              )
 
 
 

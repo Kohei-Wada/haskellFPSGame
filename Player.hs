@@ -50,12 +50,10 @@ movePlayerForward p@Player{..} gmap distance =
 
 movePlayerInDirection :: Player -> GameMap -> Double -> Double -> Player
 movePlayerInDirection p@Player{..} gmap angle distance =
-  let
-    plusX = cos angle * distance
-    plusY = -1 * (sin angle * distance)
-    tmp = (fst _playerPos + plusX, snd _playerPos + plusY)
-  in
-    p { _playerPos = if positionIsWalkable gmap tmp then tmp else _playerPos }
+  let plusX = cos angle * distance
+      plusY = -1 * (sin angle * distance)
+      tmp = (fst _playerPos + plusX, snd _playerPos + plusY)
+   in p { _playerPos = if positionIsWalkable gmap tmp then tmp else _playerPos }
 
 
 changeWeapon :: Player -> Weapon -> Player
@@ -67,7 +65,8 @@ updateFireCountDown p@Player{..} =
     p { _fireCountdown = max ( _fireCountdown - 1) 0 }
 
 
-attackRange p@Player{..} = if _weapon == Knife then knifeAttackDistance else infinity
+attackRange p@Player{..} = 
+    if _weapon == Knife then knifeAttackDistance else infinity
 
 
 weaponSprite :: Player -> Int
