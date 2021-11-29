@@ -1,13 +1,13 @@
 module Sprites where
 
 import Types
+import Options
 
 data Sprite = Sprite
   { _spriteType :: SpriteType
   , _spritePos  :: Position2D
   } deriving (Show)
  
-
 
 type SpriteType = Int
 spriteNone    = -1 :: Int
@@ -28,6 +28,14 @@ spriteFPUzi   = 12 :: Int -- animated, 2 frames
 
 
 animatedSpriteIds = [1,3,8,10,12] :: [Int] -- list of sprite IDs that are animated
+
+
+-- Gets animation frame for current frame number.
+animationFrameForSprite :: SpriteType -> Int -> Int
+animationFrameForSprite spriteId frameNumber
+  | ((frameNumber `div` animationFrameStep) `mod` 2 == 1) && (spriteId `elem` animatedSpriteIds) = 1
+  | otherwise = 0
+
 
 spriteList =
   [

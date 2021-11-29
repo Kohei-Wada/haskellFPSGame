@@ -53,13 +53,13 @@ projectSprite :: (SpriteType,Double,Double) -> [(SpriteType,Int,Double)] -> [(Sp
 projectSprite spriteInfo screenList = -- projects a single sprite to screen list
     let spritePos = (snd3 spriteInfo) * fromIntegral ((length screenList) - 1)
         spriteLength = (distanceToSize (thd3 spriteInfo)) * fromIntegral (fst spriteSize) * spriteScale
-        spriteInterval = ( floor (spritePos - spriteLength / 2) , floor (spritePos + spriteLength / 2) )
+        spriteInterval = (floor (spritePos - spriteLength / 2) , floor (spritePos + spriteLength / 2) )
 
      in map (\item -> if (snd item) >= (fst spriteInterval) && (snd item) <= (snd spriteInterval)
                 then
                   (
                     (fst3 spriteInfo),
-                    round $ ((fromIntegral ( (snd item) - (fst spriteInterval) )) / spriteLength) * fromIntegral ((fst spriteSize) - 1),
+                    round $ ((fromIntegral((snd item) - (fst spriteInterval))) / spriteLength) * fromIntegral ((fst spriteSize) - 1),
                     (thd3 spriteInfo)
                   )
                 else (fst item)
@@ -70,63 +70,35 @@ projectSprite spriteInfo screenList = -- projects a single sprite to screen list
 {- Projects sprites to screen space, returns a list representing screen, 
    each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
 
-projectSprites :: GameState -> [(SpriteType,Int,Double)]
-projectSprites gs@GameState{..} =
-  let
-    -- project all sprites to screenspace first:
-    screenspaceSprites =  -- [(sprite id,sprite x pixel,distance)]
-      [
-        (
-          _spriteType sprite,                                     
-            0.5 +         -- sprite center in screenspace, normalized
-            (
-              angleAngleDifference (_playerRot _player) (vectorAngle ( fst (_spritePos sprite) - fst (_playerPos _player), snd (_spritePos sprite) - snd (_playerPos _player)) )
-            )
-            / fieldOfView
-            ,
-          (pointPointDistance (_playerPos _player)(_spritePos sprite)) - spriteDepthBias   -- sprite distance
-        )
-        | sprite <- _sprites 
-      ]
-      
-    emptyScreenlList = [(spriteNone,0,infinity) | i <- [0..(fst viewSize) - 1]]
+-- project all sprites to screenspace first:
+projectSprites :: [Sprite] -> Player -> [(SpriteType,Int,Double)]
+projectSprites sps p@Player{..} =
+    let emptyLs = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
+        -- [(sprite id,sprite x pixel,distance)]
+        screenspaceSprites = 
+          [
+            ( spType 
+            -- sprite center in screenspace, normalized
+            , 0.5 + (angleDifference _playerRot (vectorAngle (spx - fst _playerPos, spy - snd _playerPos))) / fieldOfView
 
-  in
-    foldl
-      (
-        \screenList1 screenList2 ->
-          map
-            (
-              \itemPair ->                  -- compare depths
-                if (thd3 (fst itemPair)) <= (thd3 (snd itemPair))
-                  then (fst itemPair)
-                  else (snd itemPair)
-            )
-            (zip screenList1 screenList2)
-      )
-             
-      emptyScreenlList
-          
-      [projectSprite spriteItem emptyScreenlList | spriteItem <- screenspaceSprites]
-      
+            , (pointDistance _playerPos spPos) - spriteDepthBias   -- sprite distance
+            ) | Sprite spType spPos@(spx, spy) <- sps 
+          ]
 
+     in foldl ( \scrnLs1 scrnLs2 -> 
+         -- compare depths
+          map (\(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
+          emptyLs
+     [projectSprite spriteItem emptyLs | spriteItem <- screenspaceSprites]
+ 
 -- Samples given sprite.
 sampleSprite :: SpriteType -> (Int,Int) -> Int -> Char
 sampleSprite spriteId coordinates animationFrame =
-  let
-    safeCoords = ( clamp (fst coordinates) (0,(fst spriteSize) - 1)
-                 , clamp (snd coordinates) (0,(snd spriteSize) - 1)
-                 )
-  in
-    ((spriteList !! (spriteId + animationFrame)) !! (snd safeCoords)) !! (fst safeCoords)
+    let safeCoords = ( clamp (fst coordinates) (0,(fst spriteSize) - 1)
+                     , clamp (snd coordinates) (0,(snd spriteSize) - 1)
+                     )
+     in ((spriteList !! (spriteId + animationFrame)) !! (snd safeCoords)) !! (fst safeCoords)
     
-
--- Gets animation frame for current frame number.
-animationFrameForSprite :: SpriteType -> Int -> Int
-animationFrameForSprite spriteId frameNumber
-  | ((frameNumber `div` animationFrameStep) `mod` 2 == 1) && (spriteId `elem` animatedSpriteIds) = 1
-  | otherwise = 0
-
 
 -- Renders the 3D player view (no bar or weapon) into String.
 render3Dview :: [(Double, Normal)] -> [(SpriteType,Int,Double)] -> Int -> Int -> String
@@ -176,18 +148,27 @@ render3Dview wallMap spriteMap height frameNumber =
 
 -- Renders the lower info bar to String.
 renderInfoBar :: GameState -> String
-renderInfoBar gs@GameState{..} =
-  let
-    separatorPositions = [0,15,31,63]
-    separator = "+" ++ [if i `elem` separatorPositions then '+' else '~' | i <- [3..(fst viewSize)]] ++ "+"
-    emptyLine = "|" ++ [if i `elem` separatorPositions then '|' else ' ' | i <- [3..(fst viewSize)]] ++ "|\n"
-    infoLine = "|  level: " ++ (toLength (show _currentLevel) 3) ++ "|  score: " ++ (toLength (show _currentScore ) 6) ++ "|  health: 100/100  ##########  |  ammo: 100/100"
-  in
-    separator ++ "\n" ++
-    emptyLine ++
-    (toLength infoLine ((fst screenSize) - 1)) ++ "|\n" ++
-    emptyLine ++
-    separator
+renderInfoBar gs@GameState{..} = 
+    let separatorPositions = [0,15,31,63]
+        separator = "+" 
+                  ++ [if i `elem` separatorPositions then '+' else '~' | i <- [3..(fst viewSize)]] 
+                  ++ "+"
+
+        emptyLine = "|" 
+                  ++ [if i `elem` separatorPositions then '|' else ' ' | i <- [3..(fst viewSize)]] 
+                  ++ "|\n"
+
+        infoLine =  "|  level: "  ++ (toLength (show _currentLevel) 3) 
+                 ++ "|  score: "  ++ (toLength (show _currentScore ) 6) 
+                 ++ "|  health: 100/100  ##########  |  ammo: 100/100"
+
+     in separator 
+     ++ "\n" 
+     ++ emptyLine 
+     ++ (toLength infoLine ((fst screenSize) - 1)) 
+     ++ "|\n" 
+     ++ emptyLine 
+     ++ separator
       
 
 -- Overlays a string image over another
@@ -196,7 +177,6 @@ overlay background foreground position backgroundResolution foregroundResolution
     let backgroundLines = splitChunks (fst backgroundResolution) background
         (firstLines,restLines) = splitAt (snd position) backgroundLines
         (secondLines,thirdLines) = splitAt (snd foregroundResolution) restLines
-    
         foregroundLines =
           [
             take (fst position) (snd item) ++
@@ -217,7 +197,7 @@ renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
       gunSprite    = weaponSprite _player
    in (overlay
-        (render3Dview wallDrawInfo (projectSprites gs) (snd viewSize) _frameNumber)
+        (render3Dview wallDrawInfo (projectSprites _sprites _player) (snd viewSize) _frameNumber)
         (concat (spriteList !! gunSprite))
         weaponSpritePosition
         (addPairs viewSize (1,0))
@@ -284,35 +264,12 @@ updateSprites ms = map (\m -> Sprite { _spriteType = monsterSprite (_monsterType
                                      , _spritePos  = (_monsterPos m)}) ms  
    
 
--- Runs the AI for each monster, updating their positions etc.
-updateMonsters :: [Monster] -> Player -> GameMap -> Int -> [Monster]
-updateMonsters ms p@Player{..} gmap frameNum =
-  if disableAI 
-     then ms 
-     else map (\m -> updateMonster m p gmap frameNum) $ filter ((>0) . _hp) ms
-
-
-updateMonsterByfire :: Monster -> Player -> GameMap -> Monster
-updateMonsterByfire m p gmap = 
-     if angleDiff < angleRange / 2 && md <= wd && md <= atkRange 
-        then monsterDamaged m weaponDamage else m
-            where angleDiff  = monsterAngleDiff m p
-                  md         = monsterDistance m p 
-                  angleRange = 1.0 / (md + aimAccuracy)
-                  wd         = wallDistance p gmap
-                  atkRange   = attackRange p
-
-
-updateMonstersByfire :: [Monster] -> Player -> GameMap -> [Monster]
-updateMonstersByfire ms p gmap = 
-    filter ((>0) . _hp) $ map (\m -> updateMonsterByfire m p gmap) ms
-
-
 fire :: GameState -> GameState
 fire gs@GameState{..} =
   if _fireCountdown _player == 0
     then gs { _player   = resetFireCount _player 
-            , _monsters = updateMonstersByfire _monsters _player _gameMap
+            , _monsters = filter ((>0) . _hp) $ 
+                map (\m -> attackToMonster m _player _gameMap) _monsters
             }
     else gs
 

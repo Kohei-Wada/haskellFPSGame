@@ -39,8 +39,8 @@ gameMap1 =
 
 
 -- Gets distance of two points.
-pointPointDistance :: Position2D -> Position2D -> Double
-pointPointDistance point1 point2 =
+pointDistance :: Position2D -> Position2D -> Double
+pointDistance point1 point2 =
   let dx = (fst point1) - (fst point2)
       dy = (snd point1) - (snd point2)
    in sqrt $ dx * dx + dy * dy
@@ -125,7 +125,7 @@ castRay gmap rayOrigin square rayDirection maxIterations =
           recursionResult = castRay gmap (fst squareCastResult) (addPairs square (snd squareCastResult)) angle (maxIterations - 1)
         in
           (
-            pointPointDistance rayOrigin (fst squareCastResult) + (fst recursionResult),
+            pointDistance rayOrigin (fst squareCastResult) + (fst recursionResult),
             if (fst recursionResult) /= 0
               then (snd recursionResult)
               else
@@ -148,7 +148,7 @@ castRaySquare squareCoords rayPosition rayAngle =
     intersection1 = lineLineIntersection rayPosition angle (fromIntegral boundX,fromIntegral (snd squareCoords)) (pi / 2)
     intersection2 = lineLineIntersection rayPosition angle (fromIntegral (fst squareCoords),fromIntegral boundY) 0
   in
-    if (pointPointDistance rayPosition intersection1) <= (pointPointDistance rayPosition intersection2)
+    if (pointDistance rayPosition intersection1) <= (pointDistance rayPosition intersection2)
       then (intersection1, (if boundX == (fst squareCoords) then -1 else 1, 0))
       else (intersection2, (0, if boundY == (snd squareCoords) then -1 else 1))
 

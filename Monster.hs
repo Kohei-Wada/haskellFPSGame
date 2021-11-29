@@ -70,13 +70,31 @@ updateMonster m@Monster{..} p@Player{..} gmap frameNum=
 
 
 monsterDistance :: Monster -> Player -> Double
-monsterDistance m@Monster{..} p@Player{..} = pointPointDistance _monsterPos _playerPos
+monsterDistance m@Monster{..} p@Player{..} = pointDistance _monsterPos _playerPos
 
 
 monsterAngleDiff :: Monster -> Player -> Double
 monsterAngleDiff m@Monster{..} p@Player{..} = 
-     abs $ angleAngleDifference _playerRot (vectorAngle $ substractPairs _monsterPos _playerPos)
+     abs $ angleDifference _playerRot (vectorAngle $ substractPairs _monsterPos _playerPos)
 
+
+attackToMonster :: Monster -> Player -> GameMap -> Monster
+attackToMonster m p gmap = 
+     if angleDiff < angleRange / 2 && md <= wd && md <= atkRange 
+        then monsterDamaged m weaponDamage else m
+            where angleDiff  = monsterAngleDiff m p
+                  md         = monsterDistance m p 
+                  angleRange = 1.0 / (md + aimAccuracy)
+                  wd         = wallDistance p gmap
+                  atkRange   = attackRange p
+
+
+-- Runs the AI for each monster, updating their positions etc.
+updateMonsters :: [Monster] -> Player -> GameMap -> Int -> [Monster]
+updateMonsters ms p@Player{..} gmap frameNum =
+  if disableAI 
+     then ms 
+     else map (\m -> updateMonster m p gmap frameNum) $ filter ((>0) . _hp) ms
 
 
 

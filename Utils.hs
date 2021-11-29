@@ -62,8 +62,8 @@ vectorAngle vector = atan2 (-1 * (snd vector)) (fst vector)
 
 
 -- Returns the result of angle1 - angle2 closest to 0.
-angleAngleDifference :: Double -> Double -> Double
-angleAngleDifference angle1 angle2 
+angleDifference :: Double -> Double -> Double
+angleDifference angle1 angle2 
   | difference > pi = difference - 2 * pi
   | otherwise       = difference
   where difference = angleTo02Pi (angle1 - angle2)
