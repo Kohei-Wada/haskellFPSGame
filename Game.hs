@@ -95,26 +95,6 @@ castRays p@Player{..} gmap =
   ]
 
 
--- Overlays a string image over another
-overlay :: String -> String -> (Int,Int) -> (Int,Int) -> (Int,Int) -> Char -> String
-overlay background foreground position backgroundResolution foregroundResolution transparentChar =
-    let backgroundLines = splitChunks (fst backgroundResolution) background
-        (firstLines,restLines) = splitAt (snd position) backgroundLines
-        (secondLines,thirdLines) = splitAt (snd foregroundResolution) restLines
-        foregroundLines =
-          [
-            take (fst position) (snd item) ++
-              [
-                if (fst chars) == transparentChar then (snd chars) else (fst chars)
-                | chars <- zip (fst item) (take (fst foregroundResolution) (drop (fst position) (snd item)))
-              ] ++
-            drop (fst position + fst foregroundResolution) (snd item)
-            | item <- zip (splitChunks (fst foregroundResolution) foreground) secondLines
-          ]
-
-     in concat (firstLines) ++ concat (foregroundLines) ++ concat (thirdLines)
- 
-
 -- Renders the lower info bar to String.
 renderInfoBar :: GameState -> String
 renderInfoBar gs@GameState{..} = 
@@ -237,6 +217,25 @@ sampleSprite spriteId coordinates animationFrame =
      in ((spriteList !! (spriteId + animationFrame)) !! (snd safeCoords)) !! (fst safeCoords)
     
 
+-- Overlays a string image over another
+overlay :: String -> String -> (Int,Int) -> (Int,Int) -> Char -> String
+overlay background foreground backgroundResolution foregroundResolution transparentChar =
+    let backgroundLines = splitChunks (fst backgroundResolution) background
+        (wX, wY) = weaponSpPos
+        (fstLs,restLs) = splitAt wY backgroundLines
+        (sndLs, thdLs) = splitAt (snd foregroundResolution) restLs
+        foregroundLs =
+          [ take wX i2 ++
+              [ if (fst chars) == transparentChar then (snd chars) else (fst chars)
+                | chars <- zip i1 (take (fst foregroundResolution) (drop wX i2))
+              ] 
+              ++ drop (wX + fst foregroundResolution) i2
+            | (i1, i2) <- zip (splitChunks (fst foregroundResolution) foreground) sndLs
+          ]
+
+     in concat (fstLs) ++ concat (foregroundLs) ++ concat (thdLs)
+ 
+
 -- Renders the game in 3D.
 renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
@@ -245,7 +244,6 @@ renderGameState gs@GameState{..} =
    in (overlay
         (render3Dview wallDrawInfo (projectSprites _sprites _player) (snd viewSize) _frameNumber)
         (concat (spriteList !! gunSprite))
-        weaponSpritePosition
         (addPairs viewSize (1,0))
         spriteSize
         transparentChar
@@ -254,7 +252,6 @@ renderGameState gs@GameState{..} =
       renderInfoBar gs 
     
     
-
 --TODO Encapsulate the sprites inside a monster.
 -- Creates sprites and places them on the map depending on current state of things.
 updateSprites ::  [Monster] -> [Sprite]

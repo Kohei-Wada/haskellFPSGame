@@ -2,6 +2,8 @@ module Options where
 
 -- key mapping:
 
+import Types
+
 keyForward     = 'w'
 keyBackward    = 's'
 keyTurnLeft    = 'a'
@@ -52,5 +54,12 @@ fireRateUzi = 4 :: Int
 monsterHealthZombie = 100  :: Int         -- initial health amounts
 monsterHealthDemon = 50 :: Int
 
-weaponSpritePosition = ((fst viewSize) - (fst viewSize) `div` 3,1 + snd viewSize - snd spriteSize)
+
+weaponSpPos = 
+    ((fst viewSize) - (fst viewSize) `div` 3
+    ,1 + snd viewSize - snd spriteSize
+    )
+
+
+
 
