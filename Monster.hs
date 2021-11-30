@@ -25,7 +25,7 @@ newMonster :: MonsterType -> Position2D -> Monster
 newMonster monsterType initialPosition = Monster
   { _monsterType = monsterType
   , _monsterPos  = initialPosition
-  , _hp          = if monsterType == Zombie then monsterHealthZombie else monsterHealthDemon
+  , _hp          = if monsterType == Zombie then hpZombie else hpDemon 
   , _countdownAI = 0
   , _monsterRot  = 0
   }

@@ -120,51 +120,6 @@ renderInfoBar gs@GameState{..} =
      ++ separator
       
 
-
--- Renders the 3D player view (no bar or weapon) into String.
-render3Dview :: [(Double, Normal)] -> [(SpriteType,Int,Double)] -> Int -> Int -> String
-render3Dview wallMap spriteMap height frameNumber =
-  let middle = div height 2 + 1                     -- middle line of the view
-      heightDouble = (fromIntegral height)
-   in concat
-      [
-        let distanceFromMiddle = middle - i
-            absDistanceFromMiddle = abs distanceFromMiddle
-         in map
-            (
-              \item ->
-                  let normal       = (snd (fst item))
-                      distance     = (fst (fst item))
-                      columnHeight = floor ((distanceToSize distance) * heightDouble)
-                      spriteInfo   = (snd item)
-                      wallSample   = if absDistanceFromMiddle < columnHeight
-                          then 
-                            if normal      == NormalNorth then intensityToChar $ 0.25 + distanceToIntensity distance
-                            else if normal == NormalEast  then intensityToChar $ 0.50 + distanceToIntensity distance
-                            else if normal == NormalSouth then intensityToChar $ 0.75 + distanceToIntensity distance
-                            else                               intensityToChar $ 1.00 + distanceToIntensity distance
-                          else backgroundChar
-                      
-                      spriteHalfHeight = floor ( spriteScale * distanceToSize (thd3 spriteInfo) * fromIntegral (snd spriteSize) / 2 )
-                      sampleX          = snd3 spriteInfo
-                      sampleY          = round (((1 - (1 + (fromIntegral distanceFromMiddle) / (fromIntegral spriteHalfHeight)) / 2)) * fromIntegral ((snd spriteSize) - 1))
-                      spriteSample     = sampleSprite (fst3 spriteInfo) (sampleX,sampleY) (animationFrameForSprite (fst3 spriteInfo) frameNumber)
-
-                  in if (thd3 spriteInfo) >= distance -- is wall closer than sprite?
-                        then wallSample                                 
-                        else  -- sprite is closer  
-                          if absDistanceFromMiddle <= spriteHalfHeight  
-                            then
-                              if spriteSample /= transparentChar
-                                then spriteSample
-                                else wallSample
-                            else wallSample
-            )
-            (zip wallMap spriteMap) ++ "\n"
-        | i <- [1..height]
-      ]
-
-
 -- projects one sprite (sprite,x,y) to a screen list [(sprite id,sprite x pixel,distance)]
 projectSprite :: (SpriteType,Double,Double) -> [(SpriteType,Int,Double)] -> [(SpriteType,Int,Double)]  
 projectSprite spriteInfo screenList = -- projects a single sprite to screen list
@@ -183,29 +138,33 @@ projectSprite spriteInfo screenList = -- projects a single sprite to screen list
           (zip screenList [0..])
 
 
+screenspaceSprites ::  [Sprite] -> Player -> [(SpriteType, Double ,Double)]
+screenspaceSprites sps p@Player{..}  = 
+    let (pX, pY) = _playerPos in 
+    map (\(Sprite t p@(spX, spY)) ->
+            ( t 
+            , spAngleBias + 
+                (angleDifference _playerRot (vectorAngle (spX - pX, spY - pY))) / fieldOfView
+            , (pointDistance _playerPos p) - spDepthBias   -- sprite distance
+            )
+        ) sps
+
+
 {- Projects sprites to screen space, returns a list representing screen, 
    each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
 
 -- project all sprites to screenspace first:
 projectSprites :: [Sprite] -> Player -> [(SpriteType,Int,Double)]
 projectSprites sps p@Player{..} =
-    let emptyLs = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
         -- [(sprite id,sprite x pixel,distance)]
-        (pX, pY) = _playerPos
-        screenspaceSprites = 
-          [
-            -- sprite center in screenspace, normalized
-            ( spType 
-            , 0.5 + (angleDifference _playerRot (vectorAngle (spx - pX, spy - pY))) / fieldOfView
-            , (pointDistance _playerPos spPos) - spriteDepthBias   -- sprite distance
-            ) | Sprite spType spPos@(spx, spy) <- sps 
-          ]
+    let emptyLs = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
+        sprites = screenspaceSprites sps p 
 
      -- compare depths
      in foldl ( \scrnLs1 scrnLs2 -> 
           map ( \(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
           emptyLs
-     [projectSprite spriteItem emptyLs | spriteItem <- screenspaceSprites]
+     [projectSprite spriteItem emptyLs | spriteItem <- sprites]
  
 
 -- Samples given sprite.
@@ -236,14 +195,57 @@ overlay background foreground backgroundResolution foregroundResolution transpar
      in concat (fstLs) ++ concat (foregroundLs) ++ concat (thdLs)
  
 
+-- Renders the 3D player view (no bar or weapon) into String.
+render3Dview :: [(Double, Normal)] -> [(SpriteType,Int,Double)] -> Int -> Int -> String
+render3Dview wallMap spriteMap height frameNumber =
+  let middle = div height 2 + 1                     -- middle line of the view
+      heightDouble = (fromIntegral height)
+   in concat
+      [
+        let distanceFromMiddle = middle - i
+            absDistanceFromMiddle = abs distanceFromMiddle
+         in map
+            (
+              \(i1, i2) ->
+                  let normal       = (snd i1)
+                      distance     = (fst i1)
+                      columnHeight = floor ((distanceToSize distance) * heightDouble)
+                      wallSample   = if absDistanceFromMiddle < columnHeight
+                          then 
+                            if      normal == NormalNorth then intensityToChar $ 0.25 + distanceToIntensity distance
+                            else if normal == NormalEast  then intensityToChar $ 0.50 + distanceToIntensity distance
+                            else if normal == NormalSouth then intensityToChar $ 0.75 + distanceToIntensity distance
+                            else                               intensityToChar $ 1.00 + distanceToIntensity distance
+                          else backgroundChar
+                      
+                      spriteHalfHgt = floor ( spriteScale * distanceToSize (thd3 i2) * fromIntegral (snd spriteSize) / 2 )
+                      sampleX       = snd3 i2 
+                      sampleY       = round (((1 - (1 + (fromIntegral distanceFromMiddle) / (fromIntegral spriteHalfHgt)) / 2)) * fromIntegral ((snd spriteSize) - 1))
+                      spriteSample  = sampleSprite (fst3 i2) (sampleX,sampleY) (animationFrameForSprite (fst3 i2) frameNumber)
+
+                  in if (thd3 i2) >= distance -- is wall closer than sprite?
+                        then wallSample                                 
+                        else  -- sprite is closer  
+                          if absDistanceFromMiddle <= spriteHalfHgt  
+                            then
+                              if spriteSample /= transparentChar
+                                then spriteSample
+                                else wallSample
+                            else wallSample
+            )
+            (zip wallMap spriteMap) ++ "\n"
+        | i <- [1..height]
+      ]
+
+
 -- Renders the game in 3D.
 renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
-      gunSprite    = weaponSprite _player
+      wpSp = weaponSprite _player
    in (overlay
         (render3Dview wallDrawInfo (projectSprites _sprites _player) (snd viewSize) _frameNumber)
-        (concat (spriteList !! gunSprite))
+        (concat (spriteList !! wpSp))
         (addPairs viewSize (1,0))
         spriteSize
         transparentChar
