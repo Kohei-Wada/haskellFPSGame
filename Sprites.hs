@@ -5,7 +5,6 @@ import Options
 
 data Sprite = Sprite
   { _spriteType :: SpriteType
-  , _spritePos  :: Position2D
   } deriving (Show)
  
 

@@ -29,8 +29,7 @@ newMonster monsterType initialPosition = Monster
   , _hp          = if monsterType == Zombie then hpZombie else hpDemon 
   , _countdownAI = 0
   , _monsterRot  = 0
-  , _sprite      = Sprite { _spriteType = monsterSprite monsterType 
-                          , _spritePos  = initialPosition}
+  , _sprite      = Sprite { _spriteType = monsterSprite monsterType}
   }
 
 
@@ -61,14 +60,12 @@ nextMonsterRot m@Monster{..} targetPos frameNum =
                 (fst _monsterPos) + (snd _monsterPos) + (fromIntegral frameNum) / 100.0
             else _monsterRot
 
---TODO
 updateMonster :: Monster -> Player -> GameMap -> Int -> Monster
 updateMonster m@Monster{..} p@Player{..} gmap frameNum=
   m 
       { _monsterPos  = moveWithCollision gmap _monsterPos _monsterRot (mStepLen _monsterType)
       , _monsterRot  = nextMonsterRot m _playerPos frameNum
       , _countdownAI = if _countdownAI <= 0 then recomputeAIin else _countdownAI - 1
-      , _sprite      = _sprite { _spritePos = _monsterPos } 
       }
 
 
