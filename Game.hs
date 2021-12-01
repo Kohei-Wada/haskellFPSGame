@@ -138,34 +138,37 @@ projectSprite spriteInfo screenList = -- projects a single sprite to screen list
           (zip screenList [0..])
 
 
-screenspaceSprites ::  [Sprite] -> Player -> [(SpriteType, Double ,Double)]
-screenspaceSprites sps p@Player{..}  = 
-    let (pX, pY) = _playerPos in 
-    map (\(Sprite t p@(spX, spY)) ->
-            ( t 
-            , spAngleBias + 
-                (angleDifference _playerRot (vectorAngle (spX - pX, spY - pY))) / fieldOfView
-            , (pointDistance _playerPos p) - spDepthBias   -- sprite distance
-            )
-        ) sps
+screenspaceSprite :: Sprite -> Player -> (SpriteType, Double, Double) 
+screenspaceSprite  sp@Sprite{..} p@Player{..} = 
+    let (pX, pY)       = _playerPos 
+        (spX, spY)     = _spritePos 
+        angleToSprite  = vectorAngle (spX - pX, spY - pY)
 
+     in ( _spriteType 
+        , spAngleBias + (angleDifference _playerRot angleToSprite) / fieldOfView
+        , (pointDistance _spritePos _playerPos) - spDepthBias   -- sprite distance
+        )
+     
 
 {- Projects sprites to screen space, returns a list representing screen, 
    each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
 
+
+-- [(sprite id,sprite x pixel,distance)]
+screenspaceSprites :: [Sprite] -> Player -> [(SpriteType, Double, Double)]
+screenspaceSprites sps p = map (\s -> screenspaceSprite s p) sps
+
+
 -- project all sprites to screenspace first:
 projectSprites :: [Sprite] -> Player -> [(SpriteType,Int,Double)]
-projectSprites sps p@Player{..} =
-        -- [(sprite id,sprite x pixel,distance)]
-    let emptyLs = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
-        sprites = screenspaceSprites sps p 
+projectSprites sps p@Player{..} =   
+    foldl (\scrnLs1 scrnLs2 -> 
+        map (\(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
+        emptyLs
+        [projectSprite s emptyLs | s <- screenspaceSprites sps p]
 
-     -- compare depths
-     in foldl ( \scrnLs1 scrnLs2 -> 
-          map ( \(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
-          emptyLs
-     [projectSprite spriteItem emptyLs | spriteItem <- sprites]
- 
+    where 
+        emptyLs   = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
 
 -- Samples given sprite.
 sampleSprite :: SpriteType -> (Int,Int) -> Int -> Char
@@ -242,7 +245,7 @@ render3Dview wallMap spriteMap height frameNumber =
 renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
-      wpSp = weaponSprite _player
+      wpSp         = weaponSprite _player
    in (overlay
         (render3Dview wallDrawInfo (projectSprites _sprites _player) (snd viewSize) _frameNumber)
         (concat (spriteList !! wpSp))
@@ -321,7 +324,6 @@ gameLoop gs = do
     c  <- getLastChar
     t2 <- getCPUTime
     threadDelay (frameDelayUs - ((fromIntegral (t2 - t1)) `div` 1000000)) 
-    -- wait for the rest of frame time
     
 --  t3 <- getCPUTime
 --  putStrLn (show (fromIntegral (t3 - t1) / 10e9) ++ " ms")  -- for profiling, comment out otherwise
