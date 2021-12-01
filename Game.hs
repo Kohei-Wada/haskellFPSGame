@@ -98,7 +98,7 @@ castRays p@Player{..} gmap =
 -- Renders the lower info bar to String.
 renderInfoBar :: GameState -> String
 renderInfoBar gs@GameState{..} = 
-    let separatorPositions = [0,15,31,63]
+    let separatorPositions = [0, 15, 31, 63]
         separator = "+" 
                   ++ [if i `elem` separatorPositions then '+' else '~' | i <- [3..(fst viewSize)]] 
                   ++ "+"
@@ -143,10 +143,11 @@ screenspaceSprite  sp@Sprite{..} p@Player{..} =
     let (pX, pY)       = _playerPos 
         (spX, spY)     = _spritePos 
         angleToSprite  = vectorAngle (spX - pX, spY - pY)
+        dToSprite      = pointDistance _spritePos _playerPos
 
      in ( _spriteType 
         , spAngleBias + (angleDifference _playerRot angleToSprite) / fieldOfView
-        , (pointDistance _spritePos _playerPos) - spDepthBias   -- sprite distance
+        , dToSprite - spDepthBias -- sprite distance
         )
      
 
@@ -169,6 +170,7 @@ projectSprites sps p@Player{..} =
 
     where 
         emptyLs   = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
+
 
 -- Samples given sprite.
 sampleSprite :: SpriteType -> (Int,Int) -> Int -> Char
@@ -317,10 +319,14 @@ inputHandler gs@GameState{..} c
   | otherwise           = gs
 
 
+display :: GameState -> IO ()
+display gs = putStrLn (emptyLineString ++ renderGameState gs)
+
+
 gameLoop :: GameState -> IO ()
 gameLoop gs = do
     t1 <- getCPUTime
-    putStrLn (emptyLineString ++ renderGameState gs)
+    display gs
     c  <- getLastChar
     t2 <- getCPUTime
     threadDelay (frameDelayUs - ((fromIntegral (t2 - t1)) `div` 1000000)) 
