@@ -27,7 +27,6 @@ data GameState = GameState
   , _currentScore  :: Int
   , _gameMap       :: GameMap
   , _monsters      :: [Monster] -- list of monsters
-  , _sprites       :: [Sprite]  -- list of sprites
   } deriving (Show)
  
 
@@ -44,7 +43,6 @@ initialGameState = GameState
       , newMonster Demon (10,2)
       , newMonster Demon (2,10)
       ]
-  , _sprites       = []
   }
 
 
@@ -248,8 +246,9 @@ renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
       wpSp         = weaponSprite _player
+      sprites      = getSprites _monsters
    in (overlay
-        (render3Dview wallDrawInfo (projectSprites _sprites _player) (snd viewSize) _frameNumber)
+        (render3Dview wallDrawInfo (projectSprites sprites _player) (snd viewSize) _frameNumber)
         (concat (spriteList !! wpSp))
         (addPairs viewSize (1,0))
         spriteSize
@@ -269,8 +268,9 @@ fire gs@GameState{..} =
     else gs
 
 
+--TODO
 getSprites :: [Monster] -> [Sprite]
-getSprites ms = map (\m@Monster{..} -> _sprite') ms
+getSprites ms = map (\m@Monster{..} -> _sprite) ms
 
 
 -- Computes the next game state.
@@ -279,7 +279,6 @@ nextGameState gs@GameState{..}  =
     gs { _frameNumber = _frameNumber + 1
        , _player      = updateFireCountDown _player
        , _monsters    = updateMonsters _monsters _player _gameMap _frameNumber
-       , _sprites     = getSprites _monsters
        }
 
 

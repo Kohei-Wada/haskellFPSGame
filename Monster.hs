@@ -18,7 +18,7 @@ data Monster = Monster
   , _hp          :: Int
   , _countdownAI :: Int
   , _monsterRot  :: Double
-  , _sprite'     :: Sprite
+  , _sprite     :: Sprite
   } deriving (Show)
  
 
@@ -29,7 +29,7 @@ newMonster monsterType initialPosition = Monster
   , _hp          = if monsterType == Zombie then hpZombie else hpDemon 
   , _countdownAI = 0
   , _monsterRot  = 0
-  , _sprite'     = Sprite { _spriteType = monsterSprite monsterType 
+  , _sprite      = Sprite { _spriteType = monsterSprite monsterType 
                           , _spritePos  = initialPosition}
   }
 
@@ -68,7 +68,7 @@ updateMonster m@Monster{..} p@Player{..} gmap frameNum=
       { _monsterPos  = moveWithCollision gmap _monsterPos _monsterRot (mStepLen _monsterType)
       , _monsterRot  = nextMonsterRot m _playerPos frameNum
       , _countdownAI = if _countdownAI <= 0 then recomputeAIin else _countdownAI - 1
-      , _sprite'     = _sprite' { _spritePos = _monsterPos } 
+      , _sprite      = _sprite { _spritePos = _monsterPos } 
       }
 
 
