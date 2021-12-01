@@ -258,14 +258,6 @@ renderGameState gs@GameState{..} =
       ++
       renderInfoBar gs 
     
-    
---TODO Encapsulate the sprites inside a monster.
--- Creates sprites and places them on the map depending on current state of things.
-updateSprites ::  [Monster] -> [Sprite]
-updateSprites ms = 
-    map (\m -> Sprite { _spriteType = monsterSprite (_monsterType m)
-                      , _spritePos  = (_monsterPos m)}) ms  
-   
 
 fire :: GameState -> GameState
 fire gs@GameState{..} =
@@ -277,13 +269,17 @@ fire gs@GameState{..} =
     else gs
 
 
+getSprites :: [Monster] -> [Sprite]
+getSprites ms = map (\m@Monster{..} -> _sprite') ms
+
+
 -- Computes the next game state.
 nextGameState :: GameState -> GameState
 nextGameState gs@GameState{..}  =
     gs { _frameNumber = _frameNumber + 1
        , _player      = updateFireCountDown _player
        , _monsters    = updateMonsters _monsters _player _gameMap _frameNumber
-       , _sprites     = updateSprites _monsters
+       , _sprites     = getSprites _monsters
        }
 
 
