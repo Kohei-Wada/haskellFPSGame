@@ -18,7 +18,7 @@ data Monster = Monster
   , _hp          :: Int
   , _countdownAI :: Int
   , _monsterRot  :: Double
-  , _sprite     :: Sprite
+  , _sprite      :: Sprite
   } deriving (Show)
  
 

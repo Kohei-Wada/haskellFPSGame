@@ -136,40 +136,6 @@ projectSprite spriteInfo screenList = -- projects a single sprite to screen list
           (zip screenList [0..])
 
 
-screenspaceSprite :: Sprite -> Player -> (SpriteType, Double, Double) 
-screenspaceSprite  sp@Sprite{..} p@Player{..} = 
-    let (pX, pY)       = _playerPos 
-        (spX, spY)     = _spritePos 
-        angleToSprite  = vectorAngle (spX - pX, spY - pY)
-        dToSprite      = pointDistance _spritePos _playerPos
-
-     in ( _spriteType 
-        , spAngleBias + (angleDifference _playerRot angleToSprite) / fieldOfView
-        , dToSprite - spDepthBias -- sprite distance
-        )
-     
-
-{- Projects sprites to screen space, returns a list representing screen, 
-   each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
-
-
--- [(sprite id,sprite x pixel,distance)]
-screenspaceSprites :: [Sprite] -> Player -> [(SpriteType, Double, Double)]
-screenspaceSprites sps p = map (\s -> screenspaceSprite s p) sps
-
-
--- project all sprites to screenspace first:
-projectSprites :: [Sprite] -> Player -> [(SpriteType,Int,Double)]
-projectSprites sps p@Player{..} =   
-    foldl (\scrnLs1 scrnLs2 -> 
-        map (\(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
-        emptyLs
-        [projectSprite s emptyLs | s <- screenspaceSprites sps p]
-
-    where 
-        emptyLs   = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
-
-
 -- Samples given sprite.
 sampleSprite :: SpriteType -> (Int,Int) -> Int -> Char
 sampleSprite spriteId coordinates animationFrame =
@@ -183,7 +149,7 @@ sampleSprite spriteId coordinates animationFrame =
 overlay :: String -> String -> (Int,Int) -> (Int,Int) -> Char -> String
 overlay background foreground backgroundResolution foregroundResolution transparentChar =
     let backgroundLines = splitChunks (fst backgroundResolution) background
-        (wX, wY) = weaponSpPos
+        (wX, wY)       = weaponSpPos
         (fstLs,restLs) = splitAt wY backgroundLines
         (sndLs, thdLs) = splitAt (snd foregroundResolution) restLs
         foregroundLs =
@@ -239,6 +205,39 @@ render3Dview wallMap spriteMap height frameNumber =
             (zip wallMap spriteMap) ++ "\n"
         | i <- [1..height]
       ]
+     
+
+screenspaceSprite :: Player -> Monster -> (SpriteType, Double, Double) 
+screenspaceSprite p@Player{..} m@Monster{..} = 
+    let (pX, pY)    = _playerPos 
+        (mX, mY)    = _monsterPos 
+        angleToMons = vectorAngle (mX - pX, mY - pY)
+        dToMons     = pointDistance _monsterPos _playerPos
+
+     in ( _spriteType _sprite 
+        , spAngleBias + (angleDifference _playerRot angleToMons) / fieldOfView
+        , dToMons - spDepthBias -- sprite distance
+        )
+
+
+{- Projects sprites to screen space, returns a list representing screen, 
+   each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
+
+-- [(sprite id,sprite x pixel,distance)]
+screenspaceSprites :: Player -> [Monster] -> [(SpriteType, Double, Double)]
+screenspaceSprites p ms = map (\m -> screenspaceSprite p m)  ms
+
+
+-- project all sprites to screenspace first:
+projectSprites :: Player -> [Monster] -> [(SpriteType,Int,Double)]
+projectSprites p@Player{..} ms =   
+    foldl (\scrnLs1 scrnLs2 -> 
+        map (\(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
+        emptyLs
+        [projectSprite s emptyLs | s <- screenspaceSprites p ms]
+
+    where 
+        emptyLs   = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
 
 
 -- Renders the game in 3D.
@@ -246,9 +245,8 @@ renderGameState :: GameState -> String
 renderGameState gs@GameState{..} =
   let wallDrawInfo = castRays _player _gameMap
       wpSp         = weaponSprite _player
-      sprites      = getSprites _monsters
    in (overlay
-        (render3Dview wallDrawInfo (projectSprites sprites _player) (snd viewSize) _frameNumber)
+        (render3Dview wallDrawInfo (projectSprites _player _monsters) (snd viewSize) _frameNumber)
         (concat (spriteList !! wpSp))
         (addPairs viewSize (1,0))
         spriteSize
@@ -266,11 +264,6 @@ fire gs@GameState{..} =
                 map (\m -> attackToMonster m _player _gameMap) _monsters
             }
     else gs
-
-
---TODO
-getSprites :: [Monster] -> [Sprite]
-getSprites ms = map (\m@Monster{..} -> _sprite) ms
 
 
 -- Computes the next game state.
