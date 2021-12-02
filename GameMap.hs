@@ -37,12 +37,11 @@ gameMap1 =
   ]
 
 
-
 -- Gets distance of two points.
 pointDistance :: Position2D -> Position2D -> Double
-pointDistance point1 point2 =
-  let dx = (fst point1) - (fst point2)
-      dy = (snd point1) - (snd point2)
+pointDistance (px, py) (qx, qy) =
+  let dx = px - qx
+      dy = py - qy 
    in sqrt $ dx * dx + dy * dy
      
 
@@ -57,8 +56,8 @@ arrayToMapCoords coords = (mod coords (fst mapSize), div coords (fst mapSize))
 
 
 -- Computes an intersection point of two lines.
-lineLineIntersection :: Position2D -> Double -> Position2D -> Double -> Position2D
-lineLineIntersection (x1,y1) angle1 (x2,y2) angle2 = (x,y)
+lineIntersection :: Position2D -> Double -> Position2D -> Double -> Position2D
+lineIntersection (x1, y1) angle1 (x2, y2) angle2 = (x,y)
   where tan1 = tan (tanSafeAngle angle1)
         tan2 = tan (tanSafeAngle angle2)
         x = (y2 - tan2 * x2 - y1 + tan1 * x1) / (tan1 - tan2)
@@ -99,49 +98,50 @@ mapSquareAt gmap coords@(cX, cY)
 
 -- Checks if given player position is valid (collisions).
 positionIsWalkable :: GameMap -> Position2D -> Bool
-positionIsWalkable gmap position =
-  (mapSquareAt gmap (floorPair position)) == SquareEmpty
+positionIsWalkable gmap p =
+  (mapSquareAt gmap (floorPair p)) == SquareEmpty
  
 
 -- Casts a ray and returns an information (distance, normal) about a wall it hits.
 castRay :: GameMap -> Position2D -> (Int, Int) -> Double -> Int ->  (Double, Normal)
-castRay gmap rayOrigin square rayDirection maxIterations =
-  let squareCoords = floorPair rayOrigin
-      angle = angleTo02Pi rayDirection
+castRay gmap origin square direction maxIterations =
+  let squareCoords = floorPair origin
+      a = angleTo02Pi direction
    in if (mapSquareAt gmap square) /= SquareEmpty || maxIterations == 0
          then (0, NormalNorth)
-          else
-            let
-              (sqCastResX, sqCastResY) = castRaySquare square rayOrigin angle
-              (recResX, recResY) = castRay gmap sqCastResX (addPairs square sqCastResY) angle (maxIterations - 1)
-            in
-              (
-                pointDistance rayOrigin sqCastResX + recResX,
-                if recResX /= 0
-                  then recResY
-                  else
-                    case sqCastResY of
-                      (1, 0)  -> NormalEast
-                      (0, 1)  -> NormalSouth
-                      (-1, 0) -> NormalWest
-                      _       -> NormalNorth
-              )
+         else let (p, offset) = castRaySquare square origin a
+                  (d, nml)  = 
+                    castRay gmap p (addPairs square offset) a (maxIterations - 1)
+
+               in ( pointDistance origin p + d
+                  , if d /= 0
+                      then nml
+                      else
+                        case offset of
+                          (1 , 0) -> NormalEast
+                          (0 , 1) -> NormalSouth
+                          (-1, 0) -> NormalWest
+                          _       -> NormalNorth
+                  )
 
 
+-- Casts a ray inside a single square, 
+-- returns (intersection point with square bounds,next square offset)
 
--- Casts a ray inside a single square, returns (intersection point with square bounds,next square offset)
-castRaySquare :: (Int, Int) -> Position2D -> Double -> (Position2D,(Int, Int))
+castRaySquare :: (Int, Int) -> Position2D -> Double -> (Position2D, (Int, Int))
 castRaySquare squareCoords rayPosition rayAngle =
-  let
-    angle = 2 * pi - rayAngle
-    boundX = (fst squareCoords) + if angle < (pi / 2) || angle > (pi + pi / 2) then 1 else 0
-    boundY = (snd squareCoords) + if angle < pi then 1 else 0
-    intersection1 = lineLineIntersection rayPosition angle (fromIntegral boundX,fromIntegral (snd squareCoords)) (pi / 2)
-    intersection2 = lineLineIntersection rayPosition angle (fromIntegral (fst squareCoords),fromIntegral boundY) 0
-  in
-    if (pointDistance rayPosition intersection1) <= (pointDistance rayPosition intersection2)
-      then (intersection1, (if boundX == (fst squareCoords) then -1 else 1, 0))
-      else (intersection2, (0, if boundY == (snd squareCoords) then -1 else 1))
+  let (sc1, sc2) = squareCoords 
+      angle      = 2 * pi - rayAngle
+      boundX     = sc1 + if angle < (pi / 2) || angle > (pi + pi / 2) then 1 else 0
+      boundY     = sc2 + if angle < pi then 1 else 0
+      intersection1 = 
+          lineIntersection rayPosition angle (fromIntegral boundX, fromIntegral sc2) (pi / 2)
+      intersection2 = 
+          lineIntersection rayPosition angle (fromIntegral sc1, fromIntegral boundY) 0
+  
+   in if (pointDistance rayPosition intersection1) <= (pointDistance rayPosition intersection2)
+      then (intersection1, (if boundX == sc1 then -1 else 1, 0))
+      else (intersection2, (0, if boundY == sc2 then -1 else 1))
 
 
 

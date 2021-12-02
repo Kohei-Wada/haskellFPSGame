@@ -82,7 +82,7 @@ renderMap gs@GameState{..} =
 
 -- Casts all rays needed to render player's view, returns a list of ray cast results.
 castRays :: Player -> GameMap -> [(Double, Normal)]
-castRays p@Player{..} gmap =
+castRays Player{..} gmap =
   [ let rayDirection = _playerRot + fieldOfView / 2 - (fromIntegral x) * rayAngleStep
         (rayX, rayY) = 
             castRay gmap _playerPos (floorPair _playerPos) rayDirection maxRaycastIterations
@@ -95,7 +95,7 @@ castRays p@Player{..} gmap =
 
 -- Renders the lower info bar to String.
 renderInfoBar :: GameState -> String
-renderInfoBar gs@GameState{..} = 
+renderInfoBar GameState{..} = 
     let separatorPositions = [0, 15, 31, 63]
         separator = "+" 
                   ++ [if i `elem` separatorPositions then '+' else '~' | i <- [3..(fst viewSize)]] 
@@ -120,8 +120,8 @@ renderInfoBar gs@GameState{..} =
 
 -- projects one sprite (sprite,x,y) to a screen list [(sprite id,sprite x pixel,distance)]
 projectSprite :: (SpriteType,Double,Double) -> [(SpriteType,Int,Double)] -> [(SpriteType,Int,Double)]  
-projectSprite spriteInfo screenList = -- projects a single sprite to screen list
-    let spritePos      = (snd3 spriteInfo) * fromIntegral ((length screenList) - 1)
+projectSprite spriteInfo scrnLs = -- projects a single sprite to screen list
+    let spritePos      = (snd3 spriteInfo) * fromIntegral ((length scrnLs) - 1)
         spriteLength   = (distanceToSize (thd3 spriteInfo)) * fromIntegral (fst spriteSize) * spriteScale
         spriteInterval = (floor (spritePos - spriteLength / 2) , floor (spritePos + spriteLength / 2))
 
@@ -133,7 +133,7 @@ projectSprite spriteInfo screenList = -- projects a single sprite to screen list
                   )
                 else spX 
           )
-          (zip screenList [0..])
+          (zip scrnLs [0..])
 
 
 -- Samples given sprite.
@@ -149,9 +149,9 @@ sampleSprite spriteId coordinates animationFrame =
 overlay :: String -> String -> (Int,Int) -> (Int,Int) -> Char -> String
 overlay background foreground backgroundResolution foregroundResolution transparentChar =
     let backgroundLines = splitChunks (fst backgroundResolution) background
-        (wX, wY)       = weaponSpPos
-        (fstLs,restLs) = splitAt wY backgroundLines
-        (sndLs, thdLs) = splitAt (snd foregroundResolution) restLs
+        (wX, wY)        = weaponSpPos
+        (fstLs,restLs)  = splitAt wY backgroundLines
+        (sndLs, thdLs)  = splitAt (snd foregroundResolution) restLs
         foregroundLs =
           [ take wX i2 ++
               [ if (fst chars) == transparentChar then (snd chars) else (fst chars)
@@ -167,17 +167,15 @@ overlay background foreground backgroundResolution foregroundResolution transpar
 -- Renders the 3D player view (no bar or weapon) into String.
 render3Dview :: [(Double, Normal)] -> [(SpriteType,Int,Double)] -> Int -> Int -> String
 render3Dview wallMap spriteMap height frameNumber =
-  let middle = div height 2 + 1                     -- middle line of the view
-      heightDouble = (fromIntegral height)
+  let middle       = div height 2 + 1   -- middle line of the view
+      heightDouble = fromIntegral height
    in concat
       [
-        let distanceFromMiddle = middle - i
+        let distanceFromMiddle    = middle - i
             absDistanceFromMiddle = abs distanceFromMiddle
          in map
-            (
-              \(i1, i2) ->
-                  let normal       = (snd i1)
-                      distance     = (fst i1)
+            (\(i1, i2) ->
+                  let (distance, normal) = i1 
                       columnHeight = floor ((distanceToSize distance) * heightDouble)
                       wallSample   = if absDistanceFromMiddle < columnHeight
                           then 
@@ -209,24 +207,17 @@ render3Dview wallMap spriteMap height frameNumber =
 
 screenspaceSprite :: Player -> Monster -> (SpriteType, Double, Double) 
 screenspaceSprite p@Player{..} m@Monster{..} = 
-    let (pX, pY)    = _playerPos 
-        (mX, mY)    = _monsterPos 
-        angleToMons = vectorAngle (mX - pX, mY - pY)
-        dToMons     = pointDistance _monsterPos _playerPos
+    let a = angleToMonster m p
+        d = distanceToMonster m p
 
      in ( _spriteType _sprite 
-        , spAngleBias + (angleDifference _playerRot angleToMons) / fieldOfView
-        , dToMons - spDepthBias -- sprite distance
+        , (angleDifference _playerRot a) / fieldOfView + spAngleBias
+        , d - spDepthBias -- sprite distance
         )
 
 
 {- Projects sprites to screen space, returns a list representing screen, 
-   each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
-
--- [(sprite id,sprite x pixel,distance)]
-screenspaceSprites :: Player -> [Monster] -> [(SpriteType, Double, Double)]
-screenspaceSprites p ms = map (\m -> screenspaceSprite p m)  ms
-
+    each pixel has (sprite id,sprite x pixel,distance), sprite id = -1 => empty. -}
 
 -- project all sprites to screenspace first:
 projectSprites :: Player -> [Monster] -> [(SpriteType,Int,Double)]
@@ -234,10 +225,9 @@ projectSprites p@Player{..} ms =
     foldl (\scrnLs1 scrnLs2 -> 
         map (\(a, b) -> if (thd3 a) <= (thd3 b) then a else b) (zip scrnLs1 scrnLs2))
         emptyLs
-        [projectSprite s emptyLs | s <- screenspaceSprites p ms]
-
-    where 
-        emptyLs   = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
+        [projectSprite s emptyLs | s <- sps ]
+    where emptyLs = [(spriteNone, 0, infinity) | i <- [0..(fst viewSize) - 1]]
+          sps = map (\m -> screenspaceSprite p m) ms
 
 
 -- Renders the game in 3D.
@@ -260,8 +250,7 @@ fire :: GameState -> GameState
 fire gs@GameState{..} =
   if _fireCountdown _player == 0
     then gs { _player   = resetFireCount _player 
-            , _monsters = filter ((>0) . _hp) $ 
-                map (\m -> attackToMonster m _player _gameMap) _monsters
+            , _monsters = filter ((>0) . _hp) $ map (\m -> attackToMonster m _player _gameMap) _monsters
             }
     else gs
 

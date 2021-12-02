@@ -41,6 +41,9 @@ addPairs :: (Num a) => (a, a) -> (a, a) -> (a, a)
 addPairs (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
 
 
+
+
+
 substractPairs :: Num a => (a, a) -> (a, a) -> (a, a)
 substractPairs (x1, y1) (x2, y2) = (x1 - x2, y1 - y2)
 

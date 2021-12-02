@@ -97,4 +97,21 @@ updateMonsters ms p@Player{..} gmap frameNum =
      else map (\m -> updateMonster m p gmap frameNum) $ filter ((>0) . _hp) ms
 
 
+angleToMonster :: Monster -> Player -> Double
+angleToMonster m@Monster{..} p@Player{..} = 
+    let (mX, mY) = _monsterPos
+        (pX, pY) = _playerPos 
+     in vectorAngle (mX - pX, mY - pY)
+
+
+distanceToMonster :: Monster -> Player -> Double
+distanceToMonster m@Monster{..} p@Player{..} = 
+    pointDistance _monsterPos _playerPos 
+
+
+
+
+
+
+
 
