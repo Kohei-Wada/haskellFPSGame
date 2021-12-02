@@ -246,15 +246,6 @@ renderGameState gs@GameState{..} =
       renderInfoBar gs 
     
 
-fire :: GameState -> GameState
-fire gs@GameState{..} =
-  if _fireCountdown _player == 0
-    then gs { _player   = resetFireCount _player 
-            , _monsters = filter ((>0) . _hp) $ map (\m -> attackToMonster m _player _gameMap) _monsters
-            }
-    else gs
-
-
 -- Computes the next game state.
 nextGameState :: GameState -> GameState
 nextGameState gs@GameState{..}  =
@@ -281,14 +272,23 @@ getLastChar = do
         return ' '
     
 
+fire :: GameState -> GameState
+fire gs@GameState{..} =
+  if _fireCountdown _player == 0
+    then gs { _player   = resetFireCount _player 
+            , _monsters = filter ((>0) . _hp) $ map (\m -> attackToMonster m _player _gameMap) _monsters
+            }
+    else gs
+
+
 inputHandler :: GameState -> Char -> GameState
 inputHandler gs@GameState{..} c  
   | c == keyForward     = gs { _player = movePlayerForward _player _gameMap stepLength } 
   | c == keyBackward    = gs { _player = movePlayerForward _player _gameMap (-1 * stepLength) } 
   | c == keyTurnLeft    = gs { _player = turnLeft _player }
   | c == keyTurnRight   = gs { _player = turnRight _player }
-  | c == keyStrafeLeft  = gs { _player = strafePlayer _player _gameMap  stepLength }
-  | c == keyStrafeRight = gs { _player = strafePlayer _player _gameMap  (-1 * stepLength) }
+  | c == keyStrafeLeft  = gs { _player = strafePlayer _player _gameMap stepLength }
+  | c == keyStrafeRight = gs { _player = strafePlayer _player _gameMap (-1 * stepLength) }
   | c == keyWeapon1     = gs { _player = changeWeapon _player Knife }
   | c == keyWeapon2     = gs { _player = changeWeapon _player Gun }
   | c == keyWeapon3     = gs { _player = changeWeapon _player Uzi }

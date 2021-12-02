@@ -82,11 +82,11 @@ distanceToSize distance = 1.0 / (distance + 1.0)
 
 
 moveWithCollision :: GameMap -> Position2D -> Double -> Double -> Position2D
-moveWithCollision gmap (pX, pY) angle distance = 
+moveWithCollision gmap (x, y) angle distance = 
     let plusX = cos angle * distance
         plusY = -1 * (sin angle * distance)
-     in ( pX + if positionIsWalkable gmap (pX + plusX, pY)  then plusX else 0
-        , pY + if positionIsWalkable gmap (pX , pY + plusY) then plusY else 0
+     in ( x + if positionIsWalkable gmap (x + plusX, y)  then plusX else 0
+        , y + if positionIsWalkable gmap (x , y + plusY) then plusY else 0
         )
 
 -- Returns map square at given coords.
@@ -103,7 +103,7 @@ positionIsWalkable gmap p =
  
 
 -- Casts a ray and returns an information (distance, normal) about a wall it hits.
-castRay :: GameMap -> Position2D -> (Int, Int) -> Double -> Int ->  (Double, Normal)
+castRay :: GameMap -> Position2D -> (Int, Int) -> Double -> Int -> (Double, Normal)
 castRay gmap origin square direction maxIterations =
   let squareCoords = floorPair origin
       a = angleTo02Pi direction
@@ -114,14 +114,12 @@ castRay gmap origin square direction maxIterations =
                     castRay gmap p (addPairs square offset) a (maxIterations - 1)
 
                in ( pointDistance origin p + d
-                  , if d /= 0
-                      then nml
-                      else
-                        case offset of
-                          (1 , 0) -> NormalEast
-                          (0 , 1) -> NormalSouth
-                          (-1, 0) -> NormalWest
-                          _       -> NormalNorth
+                  , if d /= 0 then nml else
+                            case offset of
+                              (1 , 0) -> NormalEast
+                              (0 , 1) -> NormalSouth
+                              (-1, 0) -> NormalWest
+                              _       -> NormalNorth
                   )
 
 
@@ -129,19 +127,18 @@ castRay gmap origin square direction maxIterations =
 -- returns (intersection point with square bounds,next square offset)
 
 castRaySquare :: (Int, Int) -> Position2D -> Double -> (Position2D, (Int, Int))
-castRaySquare squareCoords rayPosition rayAngle =
+castRaySquare squareCoords rayPos rayAngle =
   let (sc1, sc2) = squareCoords 
       angle      = 2 * pi - rayAngle
-      boundX     = sc1 + if angle < (pi / 2) || angle > (pi + pi / 2) then 1 else 0
+      boundX     = sc1 + if angle < (pi/2) || angle > (pi + pi/2) then 1 else 0
       boundY     = sc2 + if angle < pi then 1 else 0
-      intersection1 = 
-          lineIntersection rayPosition angle (fromIntegral boundX, fromIntegral sc2) (pi / 2)
-      intersection2 = 
-          lineIntersection rayPosition angle (fromIntegral sc1, fromIntegral boundY) 0
+
+      i1 = lineIntersection rayPos angle (fromIntegral boundX, fromIntegral sc2) (pi/2)
+      i2 = lineIntersection rayPos angle (fromIntegral sc1, fromIntegral boundY) 0
   
-   in if (pointDistance rayPosition intersection1) <= (pointDistance rayPosition intersection2)
-      then (intersection1, (if boundX == sc1 then -1 else 1, 0))
-      else (intersection2, (0, if boundY == sc2 then -1 else 1))
+   in if (pointDistance rayPos i1) <= (pointDistance rayPos i2)
+      then (i1, (if boundX == sc1 then -1 else 1, 0))
+      else (i2, (0, if boundY == sc2 then -1 else 1))
 
 
 
