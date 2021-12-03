@@ -98,15 +98,13 @@ mapSquareAt gmap coords@(cX, cY)
 
 -- Checks if given player position is valid (collisions).
 positionIsWalkable :: GameMap -> Position2D -> Bool
-positionIsWalkable gmap p =
-  (mapSquareAt gmap (floorPair p)) == SquareEmpty
+positionIsWalkable gmap p = (mapSquareAt gmap (floorPair p)) == SquareEmpty
  
 
 -- Casts a ray and returns an information (distance, normal) about a wall it hits.
 castRay :: GameMap -> Position2D -> (Int, Int) -> Double -> Int -> (Double, Normal)
 castRay gmap origin square direction maxIterations =
-  let squareCoords = floorPair origin
-      a = angleTo02Pi direction
+  let a = angleTo02Pi direction
    in if (mapSquareAt gmap square) /= SquareEmpty || maxIterations == 0
          then (0, NormalNorth)
          else let (p, offset) = castRaySquare square origin a
@@ -139,6 +137,5 @@ castRaySquare squareCoords rayPos rayAngle =
    in if (pointDistance rayPos i1) <= (pointDistance rayPos i2)
       then (i1, (if boundX == sc1 then -1 else 1, 0))
       else (i2, (0, if boundY == sc2 then -1 else 1))
-
 
 
